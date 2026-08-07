@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Estoque — Village Viver Bem</title>
+<style>
+  :root{
+    --teal:#459B9A; --teal-esc:#2f6f6e; --grad1:#00A6B9; --grad2:#0AB287;
+    --verde:#4CA585; --bg:#f4f7f7; --card:#ffffff; --txt:#243b3a; --muted:#7d9a99;
+    --alerta:#e05a5a; --alerta-bg:#fdecec; --ok:#2f9e6f; --borda:#e4eded;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;font-family:'Poppins','Segoe UI',system-ui,sans-serif}
+  body{background:var(--bg);color:var(--txt);padding:0 0 40px}
+  .topo{background:linear-gradient(120deg,var(--grad1),var(--grad2));color:#fff;padding:22px 18px 26px;border-radius:0 0 22px 22px;box-shadow:0 4px 16px rgba(0,0,0,.08)}
+  .topo h1{font-size:20px;font-weight:700;display:flex;align-items:center;gap:8px}
+  .topo p{font-size:12.5px;opacity:.92;margin-top:3px}
+  .atualizado{font-size:11px;opacity:.9;margin-top:12px;display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.18);padding:6px 12px;border-radius:20px;cursor:pointer}
+  .abas{display:flex;gap:8px;padding:16px 14px 4px;position:sticky;top:0;background:var(--bg);z-index:5}
+  .aba{flex:1;text-align:center;padding:10px;border-radius:12px;background:#fff;border:1px solid var(--borda);font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;transition:.15s}
+  .aba.ativa{background:var(--teal);color:#fff;border-color:var(--teal)}
+  .wrap{padding:6px 14px}
+  .setor{margin-top:16px}
+  .setor-titulo{display:flex;align-items:center;gap:9px;font-size:15px;font-weight:700;color:var(--teal-esc);margin:6px 4px 10px}
+  .setor-titulo .qtd{margin-left:auto;font-size:11.5px;font-weight:600;color:var(--muted);background:#eaf3f2;padding:3px 9px;border-radius:20px}
+  .item{background:var(--card);border:1px solid var(--borda);border-radius:14px;padding:13px 15px;margin-bottom:9px;display:flex;align-items:center;gap:12px;box-shadow:0 1px 4px rgba(0,0,0,.03)}
+  .item .nome{font-weight:600;font-size:14px}
+  .item .sub{font-size:11.5px;color:var(--muted);margin-top:2px}
+  .item .estoque{margin-left:auto;text-align:right}
+  .item .num{font-size:20px;font-weight:700;line-height:1}
+  .item .un{font-size:11px;color:var(--muted)}
+  .baixo .num{color:var(--alerta)}
+  .tag-alerta{display:inline-block;background:var(--alerta-bg);color:var(--alerta);font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;margin-top:4px}
+  .tag-ok{display:inline-block;background:#eaf7f0;color:var(--ok);font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;margin-top:4px}
+  .mov{background:var(--card);border:1px solid var(--borda);border-radius:14px;padding:12px 15px;margin-bottom:8px;display:flex;align-items:center;gap:12px}
+  .mov .ico{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+  .mov.entrada .ico{background:#eaf7f0}
+  .mov.saida .ico{background:var(--alerta-bg)}
+  .mov .info .t{font-weight:600;font-size:13.5px}
+  .mov .info .d{font-size:11.5px;color:var(--muted);margin-top:2px}
+  .mov .val{margin-left:auto;font-weight:700;font-size:15px}
+  .mov.entrada .val{color:var(--ok)}
+  .mov.saida .val{color:var(--alerta)}
+  .oculto{display:none}
+  .rodape{text-align:center;font-size:11px;color:var(--muted);margin-top:26px}
+  .estado{text-align:center;padding:40px 20px;color:var(--muted);font-size:13.5px}
+  .spin{width:34px;height:34px;border:3px solid #dbe9e8;border-top-color:var(--teal);border-radius:50%;margin:0 auto 14px;animation:g 1s linear infinite}
+  @keyframes g{to{transform:rotate(360deg)}}
+  .resumo{display:flex;gap:10px;padding:14px 14px 0}
+  .rcard{flex:1;background:#fff;border:1px solid var(--borda);border-radius:14px;padding:12px;text-align:center}
+  .rcard .n{font-size:22px;font-weight:700;color:var(--teal)}
+  .rcard.alerta .n{color:var(--alerta)}
+  .rcard .l{font-size:10.5px;color:var(--muted);margin-top:2px}
+</style>
+</head>
+<body>
+  <div class="topo">
+    <h1>📦 Estoque Village</h1>
+    <p>Residencial Care · controle de insumos</p>
+    <div class="atualizado" onclick="carregar()">🔄 <span id="quando">Carregando...</span></div>
+  </div>
+
+  <div class="resumo">
+    <div class="rcard"><div class="n" id="r-itens">–</div><div class="l">itens no total</div></div>
+    <div class="rcard alerta"><div class="n" id="r-baixo">–</div><div class="l">estoque baixo</div></div>
+  </div>
+
+  <div class="abas">
+    <div class="aba ativa" id="ab-estoque" onclick="mostrar('estoque')">📊 Estoque</div>
+    <div class="aba" id="ab-mov" onclick="mostrar('mov')">📋 Movimentações</div>
+  </div>
+
+  <div id="tela-estoque" class="wrap">
+    <div class="estado"><div class="spin"></div>Buscando seu estoque...</div>
+  </div>
+
+  <div id="tela-mov" class="wrap oculto">
+    <div class="estado"><div class="spin"></div>Buscando movimentações...</div>
+  </div>
+
+  <div class="rodape">Village Viver Bem · Estoque v1</div>
+
+<script>
+  // ==== Configuração do seu Supabase ====
+  const SUPABASE_URL = 'https://ilssyjyabxgtwwodbzpz.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_eyYyLvibu5i4bZMAzcDTCg_Hn2Oea6j';
+
+  const SETORES = {
+    cozinha:    {icone:'🍳', nome:'Cozinha'},
+    farmacia:   {icone:'💊', nome:'Farmácia'},
+    lavanderia: {icone:'🧺', nome:'Lavanderia'}
+  };
+
+  function norm(s){ return (s||'').toString().trim().toLowerCase(); }
+  function cap(s){ s=(s||'').trim(); return s.charAt(0).toUpperCase()+s.slice(1); }
+
+  async function api(caminho){
+    const r = await fetch(SUPABASE_URL + '/rest/v1/' + caminho, {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    });
+    if(!r.ok) throw new Error('Erro ' + r.status);
+    return r.json();
+  }
+
+  async function carregar(){
+    document.getElementById('quando').textContent = 'Atualizando...';
+    try{
+      const produtos = await api('produtos?select=*&order=setor,nome');
+      const movs = await api('movimentacoes?select=*&order=data_hora.desc&limit=30');
+      renderEstoque(produtos);
+      renderMov(movs);
+      const agora = new Date();
+      document.getElementById('quando').textContent = 'Atualizado ' + agora.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+    }catch(e){
+      document.getElementById('tela-estoque').innerHTML =
+        '<div class="estado">⚠️ Não consegui carregar o estoque.<br><br>Verifique a conexão e tente recarregar.<br><small>('+e.message+')</small></div>';
+      document.getElementById('quando').textContent = 'Erro ao carregar';
+    }
+  }
+
+  function renderEstoque(produtos){
+    const el = document.getElementById('tela-estoque');
+    if(!produtos.length){ el.innerHTML = '<div class="estado">Nenhum produto cadastrado ainda.</div>'; return; }
+
+    let baixoTotal = 0;
+    // agrupa por setor
+    const grupos = {};
+    produtos.forEach(p=>{
+      const s = norm(p.setor) || 'outros';
+      (grupos[s] = grupos[s] || []).push(p);
+    });
+
+    let html = '';
+    // setores conhecidos primeiro, na ordem
+    const ordem = ['cozinha','farmacia','lavanderia'];
+    const chaves = [...ordem.filter(k=>grupos[k]), ...Object.keys(grupos).filter(k=>!ordem.includes(k))];
+
+    chaves.forEach(sKey=>{
+      const info = SETORES[sKey] || {icone:'📦', nome:cap(sKey)};
+      const itens = grupos[sKey];
+      html += `<div class="setor"><div class="setor-titulo">${info.icone} ${info.nome} <span class="qtd">${itens.length} ${itens.length===1?'item':'itens'}</span></div>`;
+      itens.forEach(p=>{
+        const est = Number(p.estoque_atual)||0;
+        const min = Number(p.estoque_minimo)||0;
+        const baixo = min>0 && est<=min;
+        if(baixo) baixoTotal++;
+        const un = (p.unidade||'un').toString().trim();
+        html += `<div class="item ${baixo?'baixo':''}">
+          <div>
+            <div class="nome">${(p.nome||'—').toString().trim()}</div>
+            <div class="sub">${un}${min>0?' · mín. '+min:''}</div>
+            ${baixo?'<span class="tag-alerta">⚠ estoque baixo</span>':'<span class="tag-ok">estoque ok</span>'}
+          </div>
+          <div class="estoque"><div class="num">${est}</div><div class="un">${un}${est===1?'':'s'}</div></div>
+        </div>`;
+      });
+      html += `</div>`;
+    });
+    el.innerHTML = html;
+
+    document.getElementById('r-itens').textContent = produtos.length;
+    document.getElementById('r-baixo').textContent = baixoTotal;
+  }
+
+  function renderMov(movs){
+    const el = document.getElementById('tela-mov');
+    if(!movs.length){ el.innerHTML = '<div class="estado">Nenhuma movimentação registrada ainda.</div>'; return; }
+    let html = '';
+    movs.forEach(m=>{
+      const ent = norm(m.tipo)==='entrada';
+      const d = m.data_hora ? new Date(m.data_hora) : null;
+      const dstr = d ? d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+' às '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) : '';
+      const setor = m.setor ? cap(m.setor) : '';
+      const resid = m.residente ? ' · Residente '+String(m.residente).trim() : '';
+      html += `<div class="mov ${ent?'entrada':'saida'}">
+        <div class="ico">${ent?'📥':'📤'}</div>
+        <div class="info">
+          <div class="t">${(m.produto_nome||m.codigo_barras||'Movimentação').toString().trim()}${setor?' · '+setor:''}</div>
+          <div class="d">${dstr}${resid}</div>
+        </div>
+        <div class="val">${ent?'+':'−'}${Number(m.quantidade)||0}</div>
+      </div>`;
+    });
+    el.innerHTML = html;
+  }
+
+  function mostrar(qual){
+    document.getElementById('tela-estoque').classList.toggle('oculto', qual!=='estoque');
+    document.getElementById('tela-mov').classList.toggle('oculto', qual!=='mov');
+    document.getElementById('ab-estoque').classList.toggle('ativa', qual==='estoque');
+    document.getElementById('ab-mov').classList.toggle('ativa', qual==='mov');
+  }
+
+  carregar();
+</script>
+</body>
+</html>
