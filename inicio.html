@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Village Viver Bem — Sistema de Cuidado</title>
+<style>
+  :root{
+    --teal:#459B9A; --teal-esc:#2f6f6e; --grad1:#00A6B9; --grad2:#0AB287;
+    --verde:#4CA585; --bg:#f4f7f7; --card:#ffffff; --txt:#243b3a; --muted:#7d9a99;
+    --borda:#e4eded;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;font-family:'Poppins','Segoe UI',system-ui,sans-serif}
+  body{background:var(--bg);color:var(--txt);padding:0 0 50px;min-height:100vh}
+  .topo{background:linear-gradient(120deg,var(--grad1),var(--grad2));color:#fff;padding:30px 20px 34px;border-radius:0 0 26px 26px;box-shadow:0 6px 20px rgba(0,0,0,.1);text-align:center}
+  .topo .logo{font-size:13px;font-weight:600;letter-spacing:2px;text-transform:uppercase;opacity:.9}
+  .topo h1{font-size:23px;font-weight:700;margin-top:6px}
+  .topo p{font-size:13px;opacity:.92;margin-top:4px}
+  .saudacao{padding:22px 18px 6px;font-size:15px;color:var(--teal-esc);font-weight:600}
+  .saudacao span{color:var(--muted);font-weight:400;font-size:13px;display:block;margin-top:2px}
+  .grade{display:grid;grid-template-columns:1fr 1fr;gap:13px;padding:14px 16px}
+  .pasta{background:var(--card);border:1px solid var(--borda);border-radius:18px;padding:20px 16px;text-decoration:none;color:var(--txt);box-shadow:0 2px 8px rgba(0,0,0,.04);transition:.15s;display:flex;flex-direction:column;gap:10px;position:relative;overflow:hidden}
+  .pasta:active{transform:scale(.97)}
+  .pasta .ico{width:52px;height:52px;border-radius:15px;display:flex;align-items:center;justify-content:center;font-size:26px}
+  .pasta .nome{font-size:15.5px;font-weight:700}
+  .pasta .desc{font-size:11.5px;color:var(--muted);line-height:1.4}
+  .pasta .seta{position:absolute;top:16px;right:16px;color:var(--teal);font-size:16px;opacity:.5}
+  .i-farmacia .ico{background:#e8f4f4;color:#2f6f6e}
+  .i-cozinha .ico{background:#fef2e8;color:#c77b3b}
+  .i-lavanderia .ico{background:#eaf1fb;color:#4a6fa5}
+  .i-secretaria .ico{background:#f0ecfb;color:#7a5fb0}
+  .i-enfermagem .ico{background:#fdecec;color:#c85a5a}
+  .i-estoque .ico{background:#eaf7f0;color:#2f9e6f}
+  .destaque{grid-column:1 / -1;background:linear-gradient(120deg,var(--teal),var(--verde));color:#fff;border:none}
+  .destaque .desc{color:rgba(255,255,255,.9)}
+  .destaque .ico{background:rgba(255,255,255,.2);color:#fff}
+  .destaque .seta{color:#fff;opacity:.8}
+  .rodape{text-align:center;font-size:11px;color:var(--muted);margin-top:30px;padding:0 20px}
+  .selo-preview{background:#fff3cd;color:#8a6000;text-align:center;font-size:12px;font-weight:600;padding:9px;border-radius:10px;margin:16px 16px 0}
+</style>
+</head>
+<body>
+  <div class="topo">
+    <div class="logo">Residencial Care</div>
+    <h1>🌳 Village Viver Bem</h1>
+    <p>Sistema de Cuidado · acesso aos setores</p>
+  </div>
+
+  <div class="selo-preview">👁️ PRÉVIA do visual — os links ainda não estão ligados</div>
+
+  <div class="saudacao">Olá! 👋
+    <span>Escolha o setor que deseja acessar</span>
+  </div>
+
+  <div class="grade">
+
+    <a class="pasta destaque i-farmacia" href="#">
+      <div class="seta">→</div>
+      <div class="ico">💊</div>
+      <div class="nome">Farmácia</div>
+      <div class="desc">Medicação por morador · entrada, saída e alerta de falta</div>
+    </a>
+
+    <a class="pasta i-cozinha" href="#">
+      <div class="seta">→</div>
+      <div class="ico">🍳</div>
+      <div class="nome">Cozinha</div>
+      <div class="desc">Estoque de alimentos e validade</div>
+    </a>
+
+    <a class="pasta i-lavanderia" href="#">
+      <div class="seta">→</div>
+      <div class="ico">🧺</div>
+      <div class="nome">Rouparia & Lavanderia</div>
+      <div class="desc">Enxoval, envio e devolução</div>
+    </a>
+
+    <a class="pasta i-secretaria" href="#">
+      <div class="seta">→</div>
+      <div class="ico">📋</div>
+      <div class="nome">Secretaria</div>
+      <div class="desc">Material de escritório e administrativo</div>
+    </a>
+
+    <a class="pasta i-enfermagem" href="#">
+      <div class="seta">→</div>
+      <div class="ico">🩺</div>
+      <div class="nome">Enfermagem</div>
+      <div class="desc">Insumos, curativos e materiais</div>
+    </a>
+
+    <a class="pasta i-estoque" href="#">
+      <div class="seta">→</div>
+      <div class="ico">📊</div>
+      <div class="nome">Ver Estoque Geral</div>
+      <div class="desc">Acompanhar tudo por setor</div>
+    </a>
+
+  </div>
+
+  <div class="rodape">Village Viver Bem · Residencial Care · Sistema de Cuidado v1 (prévia)</div>
+</body>
+</html>
