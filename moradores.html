@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Farmácia por Morador — Village Viver Bem</title>
+<style>
+  :root{
+    --teal:#459B9A; --teal-esc:#2f6f6e; --grad1:#00A6B9; --grad2:#0AB287;
+    --verde:#4CA585; --bg:#f4f7f7; --card:#ffffff; --txt:#243b3a; --muted:#7d9a99;
+    --alerta:#e05a5a; --alerta-bg:#fdecec; --ok:#2f9e6f; --borda:#e4eded;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;font-family:'Poppins','Segoe UI',system-ui,sans-serif}
+  body{background:var(--bg);color:var(--txt);padding:0 0 50px;min-height:100vh}
+  .topo{background:linear-gradient(120deg,var(--teal),var(--verde));color:#fff;padding:24px 20px 28px;border-radius:0 0 26px 26px;box-shadow:0 6px 20px rgba(0,0,0,.1)}
+  .voltar{display:inline-flex;align-items:center;gap:6px;color:#fff;text-decoration:none;font-size:13px;opacity:.9;margin-bottom:12px}
+  .topo h1{font-size:21px;font-weight:700;display:flex;align-items:center;gap:9px}
+  .topo p{font-size:12.5px;opacity:.92;margin-top:3px}
+  .atualizado{font-size:11px;opacity:.9;margin-top:12px;display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.18);padding:6px 12px;border-radius:20px;cursor:pointer}
+  .acao{padding:16px 16px 4px}
+  .btn-add{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--borda);border-radius:16px;padding:16px 18px;text-decoration:none;color:var(--txt);box-shadow:0 2px 8px rgba(0,0,0,.04)}
+  .btn-add .ico{width:46px;height:46px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:23px;background:#e8f4f4;color:var(--teal-esc)}
+  .btn-add .nome{font-size:15px;font-weight:700}
+  .btn-add .desc{font-size:11.5px;color:var(--muted);margin-top:2px}
+  .btn-add .seta{margin-left:auto;color:var(--teal);font-size:19px}
+  .titulo-sec{padding:20px 20px 4px;font-size:15px;font-weight:700;color:var(--teal-esc);display:flex;align-items:center;gap:8px}
+  .titulo-sec .qtd{margin-left:auto;font-size:11.5px;font-weight:600;color:var(--muted);background:#eaf3f2;padding:3px 9px;border-radius:20px}
+  .wrap{padding:8px 16px}
+  .morador{background:var(--card);border:1px solid var(--borda);border-radius:15px;padding:15px 16px;margin-bottom:10px;display:flex;align-items:center;gap:14px;box-shadow:0 1px 4px rgba(0,0,0,.03)}
+  .morador .av{width:46px;height:46px;border-radius:50%;background:linear-gradient(135deg,var(--grad1),var(--grad2));color:#fff;display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:700;flex-shrink:0}
+  .morador .nome{font-size:15px;font-weight:600}
+  .morador .quarto{font-size:12px;color:var(--muted);margin-top:2px}
+  .estado{text-align:center;padding:40px 20px;color:var(--muted);font-size:13.5px}
+  .spin{width:34px;height:34px;border:3px solid #dbe9e8;border-top-color:var(--teal);border-radius:50%;margin:0 auto 14px;animation:g 1s linear infinite}
+  @keyframes g{to{transform:rotate(360deg)}}
+  .rodape{text-align:center;font-size:11px;color:var(--muted);margin-top:26px;padding:0 20px}
+</style>
+</head>
+<body>
+  <div class="topo">
+    <a class="voltar" href="inicio.html">← Voltar ao início</a>
+    <h1>💊 Farmácia por Morador</h1>
+    <p>Residentes cadastrados</p>
+    <div class="atualizado" onclick="carregar()">🔄 <span id="quando">Carregando...</span></div>
+  </div>
+
+  <div class="acao">
+    <a class="btn-add" href="https://eduardonoronha9.app.n8n.cloud/form/5d70ad38-6232-4836-bae7-8828e25994e6" target="_blank">
+      <div class="ico">➕</div>
+      <div>
+        <div class="nome">Cadastrar novo morador</div>
+        <div class="desc">Registrar um novo residente</div>
+      </div>
+      <div class="seta">→</div>
+    </a>
+  </div>
+
+  <div class="titulo-sec">👥 Moradores <span class="qtd" id="contador">–</span></div>
+
+  <div id="lista" class="wrap">
+    <div class="estado"><div class="spin"></div>Buscando moradores...</div>
+  </div>
+
+  <div class="rodape">Village Viver Bem · Residencial Care · Farmácia por Morador v1</div>
+
+<script>
+  const SUPABASE_URL = 'https://ilssyjyabxgtwwodbzpz.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_eyYyLvibu5i4bZMAzcDTCg_Hn2Oea6j';
+
+  function iniciais(nome){
+    const p = (nome||'').trim().split(/\s+/);
+    if(!p[0]) return '?';
+    return ((p[0][0]||'') + (p.length>1 ? p[p.length-1][0] : '')).toUpperCase();
+  }
+
+  async function carregar(){
+    document.getElementById('quando').textContent = 'Atualizando...';
+    try{
+      const r = await fetch(SUPABASE_URL + '/rest/v1/moradores?select=*&order=nome', {
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+      });
+      if(!r.ok) throw new Error('Erro ' + r.status);
+      const moradores = await r.json();
+      render(moradores);
+      const agora = new Date();
+      document.getElementById('quando').textContent = 'Atualizado ' + agora.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+    }catch(e){
+      document.getElementById('lista').innerHTML = '<div class="estado">⚠️ Não consegui carregar os moradores.<br><small>('+e.message+')</small></div>';
+      document.getElementById('quando').textContent = 'Erro ao carregar';
+    }
+  }
+
+  function render(moradores){
+    const el = document.getElementById('lista');
+    document.getElementById('contador').textContent = moradores.length + (moradores.length===1?' morador':' moradores');
+    if(!moradores.length){
+      el.innerHTML = '<div class="estado">Nenhum morador cadastrado ainda.<br>Toque em "Cadastrar novo morador" acima.</div>';
+      return;
+    }
+    let html = '';
+    moradores.forEach(m=>{
+      const nome = (m.nome||'—').toString().trim();
+      const quarto = m.quarto ? ('Quarto ' + String(m.quarto).trim()) : 'Sem quarto';
+      html += `<div class="morador">
+        <div class="av">${iniciais(nome)}</div>
+        <div>
+          <div class="nome">${nome}</div>
+          <div class="quarto">🚪 ${quarto}</div>
+        </div>
+      </div>`;
+    });
+    el.innerHTML = html;
+  }
+
+  carregar();
+</script>
+</body>
+</html>
