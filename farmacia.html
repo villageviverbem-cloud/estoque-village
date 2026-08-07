@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Farmácia — Village Viver Bem</title>
+<style>
+  :root{ --teal:#459B9A; --teal-esc:#2f6f6e; --verde:#4CA585; --bg:#f4f7f7; --card:#fff; --txt:#243b3a; --muted:#7d9a99; --cor:#2f6f6e; --cor-bg:#e8f4f4; --borda:#e4eded; }
+  *{box-sizing:border-box;margin:0;padding:0;font-family:'Poppins','Segoe UI',system-ui,sans-serif}
+  body{background:var(--bg);color:var(--txt);padding:0 0 50px;min-height:100vh}
+  .topo{background:linear-gradient(120deg,var(--teal),var(--verde));color:#fff;padding:26px 20px 30px;border-radius:0 0 26px 26px;box-shadow:0 6px 20px rgba(0,0,0,.1)}
+  .voltar{display:inline-flex;align-items:center;gap:6px;color:#fff;text-decoration:none;font-size:13px;opacity:.9;margin-bottom:14px}
+  .topo h1{font-size:23px;font-weight:700;display:flex;align-items:center;gap:10px}
+  .topo p{font-size:13px;opacity:.92;margin-top:4px}
+  .instrucao{padding:22px 20px 4px;font-size:14px;color:var(--teal-esc);font-weight:600}
+  .instrucao span{display:block;color:var(--muted);font-weight:400;font-size:12.5px;margin-top:3px}
+  .opcoes{padding:14px 16px;display:flex;flex-direction:column;gap:13px}
+  .opcao{background:var(--card);border:1px solid var(--borda);border-radius:18px;padding:20px 18px;text-decoration:none;color:var(--txt);box-shadow:0 2px 8px rgba(0,0,0,.04);transition:.15s;display:flex;align-items:center;gap:15px}
+  .opcao:active{transform:scale(.98)}
+  .opcao .ico{width:54px;height:54px;border-radius:15px;display:flex;align-items:center;justify-content:center;font-size:27px;flex-shrink:0}
+  .opcao .txt .nome{font-size:16px;font-weight:700}
+  .opcao .txt .desc{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.4}
+  .opcao .seta{margin-left:auto;color:var(--cor);font-size:20px}
+  .op-mov .ico{background:var(--cor-bg);color:var(--cor)}
+  .op-ver .ico{background:#eaf7f0;color:#2f9e6f}
+  .op-breve{opacity:.7}
+  .op-breve .ico{background:#f0ecfb;color:#7a5fb0}
+  .badge-breve{background:#f0ecfb;color:#7a5fb0;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;margin-left:8px}
+  .dica{background:#eef6f6;border:1px solid #d6e8e7;border-radius:14px;padding:14px 16px;margin:6px 16px;font-size:12.5px;color:var(--teal-esc);line-height:1.5}
+  .dica b{color:var(--cor)}
+  .rodape{text-align:center;font-size:11px;color:var(--muted);margin-top:26px;padding:0 20px}
+</style>
+</head>
+<body>
+  <div class="topo">
+    <a class="voltar" href="inicio.html">← Voltar ao início</a>
+    <h1>💊 Farmácia</h1>
+    <p>Medicamentos e insumos</p>
+  </div>
+  <div class="instrucao">O que você quer fazer?
+    <span>Escolha uma das opções abaixo</span>
+  </div>
+  <div class="opcoes">
+    <a class="opcao op-mov" href="https://eduardonoronha9.app.n8n.cloud/form/1f25fe1e-e6dd-4b9a-aa30-9a6313cf085e" target="_blank">
+      <div class="ico">➕</div>
+      <div class="txt">
+        <div class="nome">Registrar entrada / saída</div>
+        <div class="desc">Leia o código de barras e movimente o estoque</div>
+      </div>
+      <div class="seta">→</div>
+    </a>
+    <a class="opcao op-ver" href="estoque.html" target="_blank">
+      <div class="ico">📊</div>
+      <div class="txt">
+        <div class="nome">Ver estoque</div>
+        <div class="desc">Acompanhe o que tem e o que está baixo</div>
+      </div>
+      <div class="seta">→</div>
+    </a>
+    <div class="opcao op-breve">
+      <div class="ico">🧑‍🦳</div>
+      <div class="txt">
+        <div class="nome">Medicação por morador <span class="badge-breve">EM BREVE</span></div>
+        <div class="desc">Controle de remédios de cada residente (próxima etapa)</div>
+      </div>
+    </div>
+  </div>
+  <div class="dica">
+    💡 <b>Em construção:</b> o controle de <b>medicação por morador</b> (cada residente com seus remédios) é a próxima etapa do sistema. Por enquanto, use <b>Registrar entrada / saída</b> para o estoque geral da farmácia.
+  </div>
+  <div class="rodape">Village Viver Bem · Residencial Care · Farmácia v1</div>
+</body>
+</html>
