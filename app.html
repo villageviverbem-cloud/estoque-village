@@ -159,6 +159,9 @@
 
   function norm(s){ return (s||'').toString().trim().toLowerCase(); }
   function cap(s){ s=(s||'').trim(); return s.charAt(0).toUpperCase()+s.slice(1); }
+  function esc(s){
+    return (s===undefined||s===null?'':String(s)).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
   function iniciais(nome){
     const p = (nome||'').trim().split(/\s+/);
     if(!p[0]) return '?';
@@ -226,7 +229,6 @@
   // ---------- SETOR (menu de opções) ----------
   function telaSetor(chave){
     const s = SETORES[chave];
-    if(!s){ location.hash = 'inicio'; return; }
     const opMoradores = s.moradores ? `
         <a class="opcao" href="#moradores">
           <div class="ico" style="background:#f0ecfb;color:#7a5fb0">🧑‍🦳</div>
@@ -295,17 +297,22 @@
   };
 
   window.carregarEstoque = async function(){
+    const token = viewToken;
     document.getElementById('quando').textContent = 'Atualizando...';
     try{
-      const produtos = await api('produtos?select=*&order=setor,nome');
-      const movs = await api('movimentacoes?select=*&order=data_hora.desc&limit=30');
+      const [produtos, movs] = await Promise.all([
+        api('produtos?select=*&order=setor,nome'),
+        api('movimentacoes?select=*&order=data_hora.desc&limit=30')
+      ]);
+      if(token !== viewToken) return;
       renderEstoque(produtos);
       renderMov(movs);
       const agora = new Date();
       document.getElementById('quando').textContent = 'Atualizado ' + agora.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
     }catch(e){
+      if(token !== viewToken) return;
       document.getElementById('tela-estoque').innerHTML =
-        '<div class="estado">⚠️ Não consegui carregar o estoque.<br><br>Verifique a conexão e tente recarregar.<br><small>('+e.message+')</small></div>';
+        '<div class="estado">⚠️ Não consegui carregar o estoque.<br><br>Verifique a conexão e tente recarregar.<br><small>('+esc(e.message)+')</small></div>';
       document.getElementById('quando').textContent = 'Erro ao carregar';
     }
   };
@@ -325,16 +332,16 @@
     chaves.forEach(sKey=>{
       const info = SETORES_ESTOQUE[sKey] || {icone:'📦', nome:cap(sKey)};
       const itens = grupos[sKey];
-      html += `<div class="setor"><div class="setor-titulo">${info.icone} ${info.nome} <span class="qtd">${itens.length} ${itens.length===1?'item':'itens'}</span></div>`;
+      html += `<div class="setor"><div class="setor-titulo">${info.icone} ${esc(info.nome)} <span class="qtd">${itens.length} ${itens.length===1?'item':'itens'}</span></div>`;
       itens.forEach(p=>{
         const est = Number(p.estoque_atual)||0;
         const min = Number(p.estoque_minimo)||0;
         const baixo = min>0 && est<=min;
         if(baixo) baixoTotal++;
-        const un = (p.unidade||'un').toString().trim();
+        const un = esc((p.unidade||'un').toString().trim());
         html += `<div class="item ${baixo?'baixo':''}">
           <div>
-            <div class="nome">${(p.nome||'—').toString().trim()}</div>
+            <div class="nome">${esc((p.nome||'—').toString().trim())}</div>
             <div class="sub">${un}${min>0?' · mín. '+min:''}</div>
             ${baixo?'<span class="tag-alerta">⚠ estoque baixo</span>':'<span class="tag-ok">estoque ok</span>'}
           </div>
@@ -356,12 +363,12 @@
       const ent = norm(m.tipo)==='entrada';
       const d = m.data_hora ? new Date(m.data_hora) : null;
       const dstr = d ? d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+' às '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) : '';
-      const setor = m.setor ? cap(m.setor) : '';
-      const resid = m.residente ? ' · Residente '+String(m.residente).trim() : '';
+      const setor = m.setor ? esc(cap(m.setor)) : '';
+      const resid = m.residente ? ' · Residente '+esc(String(m.residente).trim()) : '';
       html += `<div class="mov ${ent?'entrada':'saida'}">
         <div class="ico">${ent?'📥':'📤'}</div>
         <div class="info">
-          <div class="t">${(m.produto_nome||m.codigo_barras||'Movimentação').toString().trim()}${setor?' · '+setor:''}</div>
+          <div class="t">${esc((m.produto_nome||m.codigo_barras||'Movimentação').toString().trim())}${setor?' · '+setor:''}</div>
           <div class="d">${dstr}${resid}</div>
         </div>
         <div class="val">${ent?'+':'−'}${Number(m.quantidade)||0}</div>
@@ -394,9 +401,11 @@
   }
 
   window.carregarMoradores = async function(){
+    const token = viewToken;
     document.getElementById('quando').textContent = 'Atualizando...';
     try{
       const moradores = await api('moradores?select=*&order=nome');
+      if(token !== viewToken) return;
       const el = document.getElementById('lista');
       document.getElementById('contador').textContent = moradores.length + (moradores.length===1?' morador':' moradores');
       if(!moradores.length){
@@ -405,10 +414,10 @@
         let html = '';
         moradores.forEach(m=>{
           const nome = (m.nome||'—').toString().trim();
-          const quarto = m.quarto ? ('Quarto ' + String(m.quarto).trim()) : 'Sem quarto';
+          const quarto = m.quarto ? ('Quarto ' + esc(String(m.quarto).trim())) : 'Sem quarto';
           html += `<div class="morador">
-            <div class="av">${iniciais(nome)}</div>
-            <div><div class="nome">${nome}</div><div class="quarto">🚪 ${quarto}</div></div>
+            <div class="av">${esc(iniciais(nome))}</div>
+            <div><div class="nome">${esc(nome)}</div><div class="quarto">🚪 ${quarto}</div></div>
           </div>`;
         });
         el.innerHTML = html;
@@ -416,13 +425,16 @@
       const agora = new Date();
       document.getElementById('quando').textContent = 'Atualizado ' + agora.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
     }catch(e){
-      document.getElementById('lista').innerHTML = '<div class="estado">⚠️ Não consegui carregar os moradores.<br><small>('+e.message+')</small></div>';
+      if(token !== viewToken) return;
+      document.getElementById('lista').innerHTML = '<div class="estado">⚠️ Não consegui carregar os moradores.<br><small>('+esc(e.message)+')</small></div>';
       document.getElementById('quando').textContent = 'Erro ao carregar';
     }
   };
 
   // ---------- ROTEADOR ----------
+  let viewToken = 0;
   function router(){
+    viewToken++;
     const hash = location.hash.replace('#','') || 'inicio';
     if(hash === 'inicio') telaInicio();
     else if(hash === 'estoque') telaEstoque();
