@@ -116,6 +116,9 @@
   const FORM_CADASTRO_PRODUTO = 'https://eduardonoronha9.app.n8n.cloud/form/5c0cf483-dcfb-4a6e-8a00-eacde4067546';
   const FORM_CADASTRO_MORADOR = 'https://eduardonoronha9.app.n8n.cloud/form/5d70ad38-6232-4836-bae7-8828e25994e6';
 
+  // ==== App financeiro (DRE, folha, contas a pagar etc.) — sistema próprio, hospedado à parte ====
+  const APP_FINANCEIRO = 'https://villageviverbem-cloud.github.io/Village-Financeiro/';
+
   const SETORES_ESTOQUE = {
     cozinha:    {icone:'🍳', nome:'Cozinha'},
     farmacia:   {icone:'💊', nome:'Farmácia'},
@@ -209,6 +212,11 @@
         <a class="pasta" href="#estoque">
           <div class="seta">→</div><div class="ico" style="background:#eaf7f0;color:#2f9e6f">📊</div>
           <div class="nome">Ver Estoque Geral</div><div class="desc">Acompanhar tudo por setor</div>
+        </a>
+        <a class="pasta destaque" href="${APP_FINANCEIRO}" target="_blank" style="background:linear-gradient(120deg,#2f9e6f,#1a6b4a)">
+          <div class="seta">→</div><div class="ico">💰</div>
+          <div class="nome">Financeiro (DRE)</div>
+          <div class="desc">Dashboard, DRE, folha de pagamento, contas a pagar e mensalidades</div>
         </a>
       </div>
       <div class="rodape">Village Viver Bem · Residencial Care · App único v1</div>
