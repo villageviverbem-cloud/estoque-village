@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Village Viver Bem — App</title>
+<style>
+  :root{
+    --teal:#459B9A; --teal-esc:#2f6f6e; --grad1:#00A6B9; --grad2:#0AB287;
+    --verde:#4CA585; --bg:#f4f7f7; --card:#ffffff; --txt:#243b3a; --muted:#7d9a99;
+    --alerta:#e05a5a; --alerta-bg:#fdecec; --ok:#2f9e6f; --borda:#e4eded;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;font-family:'Poppins','Segoe UI',system-ui,sans-serif}
+  body{background:var(--bg);color:var(--txt);padding:0 0 50px;min-height:100vh}
+  a{text-decoration:none;color:inherit}
+
+  /* topo comum a todas as telas */
+  .topo{color:#fff;padding:26px 20px 30px;border-radius:0 0 26px 26px;box-shadow:0 6px 20px rgba(0,0,0,.1)}
+  .topo.grande{padding:30px 20px 34px;text-align:center}
+  .voltar{display:inline-flex;align-items:center;gap:6px;color:#fff;text-decoration:none;font-size:13px;opacity:.9;margin-bottom:14px;background:none;border:none;cursor:pointer;font-family:inherit}
+  .topo h1{font-size:23px;font-weight:700;display:flex;align-items:center;gap:10px}
+  .topo.grande h1{justify-content:center}
+  .topo p{font-size:13px;opacity:.92;margin-top:4px}
+  .logo{font-size:13px;font-weight:600;letter-spacing:2px;text-transform:uppercase;opacity:.9}
+  .atualizado{font-size:11px;opacity:.9;margin-top:12px;display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.18);padding:6px 12px;border-radius:20px;cursor:pointer;border:none;color:#fff;font-family:inherit}
+
+  /* menu inicial (grade de setores) */
+  .saudacao{padding:22px 18px 6px;font-size:15px;color:var(--teal-esc);font-weight:600}
+  .saudacao span{color:var(--muted);font-weight:400;font-size:13px;display:block;margin-top:2px}
+  .grade{display:grid;grid-template-columns:1fr 1fr;gap:13px;padding:14px 16px}
+  .pasta{background:var(--card);border:1px solid var(--borda);border-radius:18px;padding:20px 16px;color:var(--txt);box-shadow:0 2px 8px rgba(0,0,0,.04);transition:.15s;display:flex;flex-direction:column;gap:10px;position:relative;overflow:hidden}
+  .pasta:active{transform:scale(.97)}
+  .pasta .ico{width:52px;height:52px;border-radius:15px;display:flex;align-items:center;justify-content:center;font-size:26px}
+  .pasta .nome{font-size:15.5px;font-weight:700}
+  .pasta .desc{font-size:11.5px;color:var(--muted);line-height:1.4}
+  .pasta .seta{position:absolute;top:16px;right:16px;color:var(--teal);font-size:16px;opacity:.5}
+  .destaque{grid-column:1 / -1;background:linear-gradient(120deg,var(--teal),var(--verde));color:#fff;border:none}
+  .destaque .desc{color:rgba(255,255,255,.9)}
+  .destaque .ico{background:rgba(255,255,255,.2);color:#fff}
+  .destaque .seta{color:#fff;opacity:.8}
+
+  /* menus de setor (opções) */
+  .instrucao{padding:22px 20px 4px;font-size:14px;color:var(--teal-esc);font-weight:600}
+  .instrucao span{display:block;color:var(--muted);font-weight:400;font-size:12.5px;margin-top:3px}
+  .opcoes{padding:14px 16px;display:flex;flex-direction:column;gap:13px}
+  .opcao{background:var(--card);border:1px solid var(--borda);border-radius:18px;padding:18px;color:var(--txt);box-shadow:0 2px 8px rgba(0,0,0,.04);transition:.15s;display:flex;align-items:center;gap:15px}
+  .opcao:active{transform:scale(.98)}
+  .opcao .ico{width:52px;height:52px;border-radius:15px;display:flex;align-items:center;justify-content:center;font-size:25px;flex-shrink:0}
+  .opcao .txt .nome{font-size:15.5px;font-weight:700}
+  .opcao .txt .desc{font-size:11.5px;color:var(--muted);margin-top:3px;line-height:1.4}
+  .opcao .seta{margin-left:auto;font-size:19px}
+  .dica{background:#eef6f6;border:1px solid #d6e8e7;border-radius:14px;padding:14px 16px;margin:6px 16px;font-size:12.5px;color:var(--teal-esc);line-height:1.5}
+  .dica b{color:var(--teal-esc)}
+
+  /* estoque */
+  .resumo{display:flex;gap:10px;padding:14px 14px 0}
+  .rcard{flex:1;background:#fff;border:1px solid var(--borda);border-radius:14px;padding:12px;text-align:center}
+  .rcard .n{font-size:22px;font-weight:700;color:var(--teal)}
+  .rcard.alerta .n{color:var(--alerta)}
+  .rcard .l{font-size:10.5px;color:var(--muted);margin-top:2px}
+  .abas{display:flex;gap:8px;padding:16px 14px 4px;position:sticky;top:0;background:var(--bg);z-index:5}
+  .aba{flex:1;text-align:center;padding:10px;border-radius:12px;background:#fff;border:1px solid var(--borda);font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;transition:.15s}
+  .aba.ativa{background:var(--teal);color:#fff;border-color:var(--teal)}
+  .wrap{padding:6px 14px}
+  .setor{margin-top:16px}
+  .setor-titulo{display:flex;align-items:center;gap:9px;font-size:15px;font-weight:700;color:var(--teal-esc);margin:6px 4px 10px}
+  .setor-titulo .qtd{margin-left:auto;font-size:11.5px;font-weight:600;color:var(--muted);background:#eaf3f2;padding:3px 9px;border-radius:20px}
+  .item{background:var(--card);border:1px solid var(--borda);border-radius:14px;padding:13px 15px;margin-bottom:9px;display:flex;align-items:center;gap:12px;box-shadow:0 1px 4px rgba(0,0,0,.03)}
+  .item .nome{font-weight:600;font-size:14px}
+  .item .sub{font-size:11.5px;color:var(--muted);margin-top:2px}
+  .item .estoque{margin-left:auto;text-align:right}
+  .item .num{font-size:20px;font-weight:700;line-height:1}
+  .item .un{font-size:11px;color:var(--muted)}
+  .baixo .num{color:var(--alerta)}
+  .tag-alerta{display:inline-block;background:var(--alerta-bg);color:var(--alerta);font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;margin-top:4px}
+  .tag-ok{display:inline-block;background:#eaf7f0;color:var(--ok);font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;margin-top:4px}
+  .mov{background:var(--card);border:1px solid var(--borda);border-radius:14px;padding:12px 15px;margin-bottom:8px;display:flex;align-items:center;gap:12px}
+  .mov .ico{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+  .mov.entrada .ico{background:#eaf7f0}
+  .mov.saida .ico{background:var(--alerta-bg)}
+  .mov .info .t{font-weight:600;font-size:13.5px}
+  .mov .info .d{font-size:11.5px;color:var(--muted);margin-top:2px}
+  .mov .val{margin-left:auto;font-weight:700;font-size:15px}
+  .mov.entrada .val{color:var(--ok)}
+  .mov.saida .val{color:var(--alerta)}
+  .oculto{display:none}
+
+  /* moradores */
+  .acao{padding:16px 16px 4px}
+  .btn-add{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--borda);border-radius:16px;padding:16px 18px;color:var(--txt);box-shadow:0 2px 8px rgba(0,0,0,.04)}
+  .btn-add .ico{width:46px;height:46px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:23px;background:#e8f4f4;color:var(--teal-esc)}
+  .btn-add .nome{font-size:15px;font-weight:700}
+  .btn-add .desc{font-size:11.5px;color:var(--muted);margin-top:2px}
+  .btn-add .seta{margin-left:auto;color:var(--teal);font-size:19px}
+  .morador{background:var(--card);border:1px solid var(--borda);border-radius:15px;padding:15px 16px;margin-bottom:10px;display:flex;align-items:center;gap:14px;box-shadow:0 1px 4px rgba(0,0,0,.03)}
+  .morador .av{width:46px;height:46px;border-radius:50%;background:linear-gradient(135deg,var(--grad1),var(--grad2));color:#fff;display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:700;flex-shrink:0}
+  .morador .nome{font-size:15px;font-weight:600}
+  .morador .quarto{font-size:12px;color:var(--muted);margin-top:2px}
+
+  .estado{text-align:center;padding:40px 20px;color:var(--muted);font-size:13.5px}
+  .spin{width:34px;height:34px;border:3px solid #dbe9e8;border-top-color:var(--teal);border-radius:50%;margin:0 auto 14px;animation:g 1s linear infinite}
+  @keyframes g{to{transform:rotate(360deg)}}
+  .rodape{text-align:center;font-size:11px;color:var(--muted);margin-top:26px;padding:0 20px}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+  // ==== Configuração do Supabase (compartilhada por todo o app) ====
+  const SUPABASE_URL = 'https://ilssyjyabxgtwwodbzpz.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_eyYyLvibu5i4bZMAzcDTCg_Hn2Oea6j';
+
+  // ==== Links dos formulários n8n (compartilhados por todos os setores) ====
+  const FORM_MOVIMENTACAO = 'https://eduardonoronha9.app.n8n.cloud/form/1f25fe1e-e6dd-4b9a-aa30-9a6313cf085e';
+  const FORM_CADASTRO_PRODUTO = 'https://eduardonoronha9.app.n8n.cloud/form/5c0cf483-dcfb-4a6e-8a00-eacde4067546';
+  const FORM_CADASTRO_MORADOR = 'https://eduardonoronha9.app.n8n.cloud/form/5d70ad38-6232-4836-bae7-8828e25994e6';
+
+  const SETORES_ESTOQUE = {
+    cozinha:    {icone:'🍳', nome:'Cozinha'},
+    farmacia:   {icone:'💊', nome:'Farmácia'},
+    lavanderia: {icone:'🧺', nome:'Lavanderia'},
+    secretaria: {icone:'📋', nome:'Secretaria'},
+    enfermagem: {icone:'🩺', nome:'Enfermagem'}
+  };
+
+  // ==== Configuração de cada setor (menu de opções) ====
+  const SETORES = {
+    farmacia: {
+      icone:'💊', nome:'Farmácia', sub:'Medicamentos, insumos e moradores',
+      grad:['var(--teal)','var(--verde)'], cor:'#2f6f6e', corBg:'#e8f4f4',
+      moradores:true,
+      dica:'💡 <b>Dica:</b> ao ler produtos com o leitor, preencha tudo primeiro e deixe o <b>código de barras por último</b>. O controle de medicação de cada morador é a próxima etapa.'
+    },
+    cozinha: {
+      icone:'🍳', nome:'Cozinha', sub:'Estoque de alimentos',
+      grad:['#e8933f','#c77b3b'], cor:'#c77b3b', corBg:'#fef2e8',
+      dica:'💡 <b>Dica:</b> ao ler produtos com o leitor, preencha tudo primeiro e deixe o <b>código de barras por último</b>.'
+    },
+    lavanderia: {
+      icone:'🧺', nome:'Rouparia & Lavanderia', sub:'Enxoval, envio e devolução',
+      grad:['#5a82bd','#4a6fa5'], cor:'#4a6fa5', corBg:'#eaf1fb',
+      dica:'💡 <b>Dica:</b> ao ler produtos com o leitor, preencha tudo primeiro e deixe o <b>código de barras por último</b>.'
+    },
+    secretaria: {
+      icone:'📋', nome:'Secretaria', sub:'Material de escritório',
+      grad:['#9070c0','#7a5fb0'], cor:'#7a5fb0', corBg:'#f0ecfb',
+      dica:'💡 <b>Dica:</b> ao ler produtos com o leitor, preencha tudo primeiro e deixe o <b>código de barras por último</b>.'
+    },
+    enfermagem: {
+      icone:'🩺', nome:'Enfermagem', sub:'Insumos, curativos e materiais',
+      grad:['#d46a6a','#c85a5a'], cor:'#c85a5a', corBg:'#fdecec',
+      dica:'💡 <b>Dica:</b> ao ler produtos com o leitor, preencha tudo primeiro e deixe o <b>código de barras por último</b>.'
+    }
+  };
+
+  function norm(s){ return (s||'').toString().trim().toLowerCase(); }
+  function cap(s){ s=(s||'').trim(); return s.charAt(0).toUpperCase()+s.slice(1); }
+  function iniciais(nome){
+    const p = (nome||'').trim().split(/\s+/);
+    if(!p[0]) return '?';
+    return ((p[0][0]||'') + (p.length>1 ? p[p.length-1][0] : '')).toUpperCase();
+  }
+  async function api(caminho){
+    const r = await fetch(SUPABASE_URL + '/rest/v1/' + caminho, {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+    });
+    if(!r.ok) throw new Error('Erro ' + r.status);
+    return r.json();
+  }
+
+  const app = document.getElementById('app');
+
+  // ---------- INÍCIO ----------
+  function telaInicio(){
+    app.innerHTML = `
+      <div class="topo grande" style="background:linear-gradient(120deg,var(--grad1),var(--grad2))">
+        <div class="logo">Residencial Care</div>
+        <h1>🌳 Village Viver Bem</h1>
+        <p>Sistema de Cuidado · acesso aos setores</p>
+      </div>
+      <div class="saudacao">Olá! 👋<span>Escolha o setor que deseja acessar</span></div>
+      <div class="grade">
+        <a class="pasta destaque" href="#farmacia">
+          <div class="seta">→</div><div class="ico">💊</div>
+          <div class="nome">Farmácia</div>
+          <div class="desc">Medicação por morador · entrada, saída e alerta de falta</div>
+        </a>
+        <a class="pasta" href="#cozinha">
+          <div class="seta">→</div><div class="ico" style="background:#fef2e8;color:#c77b3b">🍳</div>
+          <div class="nome">Cozinha</div><div class="desc">Estoque de alimentos e validade</div>
+        </a>
+        <a class="pasta" href="#lavanderia">
+          <div class="seta">→</div><div class="ico" style="background:#eaf1fb;color:#4a6fa5">🧺</div>
+          <div class="nome">Rouparia & Lavanderia</div><div class="desc">Enxoval, envio e devolução</div>
+        </a>
+        <a class="pasta" href="#secretaria">
+          <div class="seta">→</div><div class="ico" style="background:#f0ecfb;color:#7a5fb0">📋</div>
+          <div class="nome">Secretaria</div><div class="desc">Material de escritório e administrativo</div>
+        </a>
+        <a class="pasta" href="#enfermagem">
+          <div class="seta">→</div><div class="ico" style="background:#fdecec;color:#c85a5a">🩺</div>
+          <div class="nome">Enfermagem</div><div class="desc">Insumos, curativos e materiais</div>
+        </a>
+        <a class="pasta" href="#moradores">
+          <div class="seta">→</div><div class="ico" style="background:#f0ecfb;color:#7a5fb0">🧑‍🦳</div>
+          <div class="nome">Moradores</div><div class="desc">Ver e cadastrar residentes</div>
+        </a>
+        <a class="pasta" href="#estoque">
+          <div class="seta">→</div><div class="ico" style="background:#eaf7f0;color:#2f9e6f">📊</div>
+          <div class="nome">Ver Estoque Geral</div><div class="desc">Acompanhar tudo por setor</div>
+        </a>
+      </div>
+      <div class="rodape">Village Viver Bem · Residencial Care · App único v1</div>
+    `;
+  }
+
+  // ---------- SETOR (menu de opções) ----------
+  function telaSetor(chave){
+    const s = SETORES[chave];
+    if(!s){ location.hash = 'inicio'; return; }
+    const opMoradores = s.moradores ? `
+        <a class="opcao" href="#moradores">
+          <div class="ico" style="background:#f0ecfb;color:#7a5fb0">🧑‍🦳</div>
+          <div class="txt"><div class="nome">Moradores</div><div class="desc">Ver e cadastrar residentes</div></div>
+          <div class="seta" style="color:${s.cor}">→</div>
+        </a>` : '';
+    app.innerHTML = `
+      <div class="topo" style="background:linear-gradient(120deg,${s.grad[0]},${s.grad[1]})">
+        <button class="voltar" onclick="location.hash='inicio'">← Voltar ao início</button>
+        <h1>${s.icone} ${s.nome}</h1>
+        <p>${s.sub}</p>
+      </div>
+      <div class="instrucao">O que você quer fazer?<span>Escolha uma das opções abaixo</span></div>
+      <div class="opcoes">
+        <a class="opcao" href="${FORM_MOVIMENTACAO}" target="_blank">
+          <div class="ico" style="background:${s.corBg};color:${s.cor}">📦</div>
+          <div class="txt"><div class="nome">Registrar entrada / saída</div><div class="desc">Leia o código e movimente o estoque</div></div>
+          <div class="seta" style="color:${s.cor}">→</div>
+        </a>
+        <a class="opcao" href="${FORM_CADASTRO_PRODUTO}" target="_blank">
+          <div class="ico" style="background:#eaf1fb;color:#4a6fa5">➕</div>
+          <div class="txt"><div class="nome">Cadastrar produto novo</div><div class="desc">Registrar um item que ainda não existe</div></div>
+          <div class="seta" style="color:${s.cor}">→</div>
+        </a>
+        ${opMoradores}
+        <a class="opcao" href="#estoque">
+          <div class="ico" style="background:#eaf7f0;color:#2f9e6f">📊</div>
+          <div class="txt"><div class="nome">Ver estoque</div><div class="desc">Acompanhe o que tem e o que está baixo</div></div>
+          <div class="seta" style="color:${s.cor}">→</div>
+        </a>
+      </div>
+      <div class="dica">${s.dica}</div>
+      <div class="rodape">Village Viver Bem · Residencial Care · ${s.nome} v2</div>
+    `;
+  }
+
+  // ---------- ESTOQUE ----------
+  function telaEstoque(){
+    app.innerHTML = `
+      <div class="topo" style="background:linear-gradient(120deg,var(--grad1),var(--grad2))">
+        <button class="voltar" onclick="location.hash='inicio'">← Voltar ao início</button>
+        <h1>📊 Estoque Village</h1>
+        <p>Residencial Care · controle de insumos</p>
+        <button class="atualizado" onclick="carregarEstoque()">🔄 <span id="quando">Carregando...</span></button>
+      </div>
+      <div class="resumo">
+        <div class="rcard"><div class="n" id="r-itens">–</div><div class="l">itens no total</div></div>
+        <div class="rcard alerta"><div class="n" id="r-baixo">–</div><div class="l">estoque baixo</div></div>
+      </div>
+      <div class="abas">
+        <div class="aba ativa" id="ab-estoque" onclick="mostrarAba('estoque')">📊 Estoque</div>
+        <div class="aba" id="ab-mov" onclick="mostrarAba('mov')">📋 Movimentações</div>
+      </div>
+      <div id="tela-estoque" class="wrap"><div class="estado"><div class="spin"></div>Buscando seu estoque...</div></div>
+      <div id="tela-mov" class="wrap oculto"><div class="estado"><div class="spin"></div>Buscando movimentações...</div></div>
+      <div class="rodape">Village Viver Bem · Estoque v1</div>
+    `;
+    carregarEstoque();
+  }
+
+  window.mostrarAba = function(qual){
+    document.getElementById('tela-estoque').classList.toggle('oculto', qual!=='estoque');
+    document.getElementById('tela-mov').classList.toggle('oculto', qual!=='mov');
+    document.getElementById('ab-estoque').classList.toggle('ativa', qual==='estoque');
+    document.getElementById('ab-mov').classList.toggle('ativa', qual==='mov');
+  };
+
+  window.carregarEstoque = async function(){
+    document.getElementById('quando').textContent = 'Atualizando...';
+    try{
+      const produtos = await api('produtos?select=*&order=setor,nome');
+      const movs = await api('movimentacoes?select=*&order=data_hora.desc&limit=30');
+      renderEstoque(produtos);
+      renderMov(movs);
+      const agora = new Date();
+      document.getElementById('quando').textContent = 'Atualizado ' + agora.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+    }catch(e){
+      document.getElementById('tela-estoque').innerHTML =
+        '<div class="estado">⚠️ Não consegui carregar o estoque.<br><br>Verifique a conexão e tente recarregar.<br><small>('+e.message+')</small></div>';
+      document.getElementById('quando').textContent = 'Erro ao carregar';
+    }
+  };
+
+  function renderEstoque(produtos){
+    const el = document.getElementById('tela-estoque');
+    if(!produtos.length){ el.innerHTML = '<div class="estado">Nenhum produto cadastrado ainda.</div>'; return; }
+    let baixoTotal = 0;
+    const grupos = {};
+    produtos.forEach(p=>{
+      const s = norm(p.setor) || 'outros';
+      (grupos[s] = grupos[s] || []).push(p);
+    });
+    let html = '';
+    const ordem = ['cozinha','farmacia','lavanderia','secretaria','enfermagem'];
+    const chaves = [...ordem.filter(k=>grupos[k]), ...Object.keys(grupos).filter(k=>!ordem.includes(k))];
+    chaves.forEach(sKey=>{
+      const info = SETORES_ESTOQUE[sKey] || {icone:'📦', nome:cap(sKey)};
+      const itens = grupos[sKey];
+      html += `<div class="setor"><div class="setor-titulo">${info.icone} ${info.nome} <span class="qtd">${itens.length} ${itens.length===1?'item':'itens'}</span></div>`;
+      itens.forEach(p=>{
+        const est = Number(p.estoque_atual)||0;
+        const min = Number(p.estoque_minimo)||0;
+        const baixo = min>0 && est<=min;
+        if(baixo) baixoTotal++;
+        const un = (p.unidade||'un').toString().trim();
+        html += `<div class="item ${baixo?'baixo':''}">
+          <div>
+            <div class="nome">${(p.nome||'—').toString().trim()}</div>
+            <div class="sub">${un}${min>0?' · mín. '+min:''}</div>
+            ${baixo?'<span class="tag-alerta">⚠ estoque baixo</span>':'<span class="tag-ok">estoque ok</span>'}
+          </div>
+          <div class="estoque"><div class="num">${est}</div><div class="un">${un}${est===1?'':'s'}</div></div>
+        </div>`;
+      });
+      html += `</div>`;
+    });
+    el.innerHTML = html;
+    document.getElementById('r-itens').textContent = produtos.length;
+    document.getElementById('r-baixo').textContent = baixoTotal;
+  }
+
+  function renderMov(movs){
+    const el = document.getElementById('tela-mov');
+    if(!movs.length){ el.innerHTML = '<div class="estado">Nenhuma movimentação registrada ainda.</div>'; return; }
+    let html = '';
+    movs.forEach(m=>{
+      const ent = norm(m.tipo)==='entrada';
+      const d = m.data_hora ? new Date(m.data_hora) : null;
+      const dstr = d ? d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+' às '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) : '';
+      const setor = m.setor ? cap(m.setor) : '';
+      const resid = m.residente ? ' · Residente '+String(m.residente).trim() : '';
+      html += `<div class="mov ${ent?'entrada':'saida'}">
+        <div class="ico">${ent?'📥':'📤'}</div>
+        <div class="info">
+          <div class="t">${(m.produto_nome||m.codigo_barras||'Movimentação').toString().trim()}${setor?' · '+setor:''}</div>
+          <div class="d">${dstr}${resid}</div>
+        </div>
+        <div class="val">${ent?'+':'−'}${Number(m.quantidade)||0}</div>
+      </div>`;
+    });
+    el.innerHTML = html;
+  }
+
+  // ---------- MORADORES ----------
+  function telaMoradores(){
+    app.innerHTML = `
+      <div class="topo" style="background:linear-gradient(120deg,var(--teal),var(--verde))">
+        <button class="voltar" onclick="location.hash='inicio'">← Voltar ao início</button>
+        <h1>💊 Farmácia por Morador</h1>
+        <p>Residentes cadastrados</p>
+        <button class="atualizado" onclick="carregarMoradores()">🔄 <span id="quando">Carregando...</span></button>
+      </div>
+      <div class="acao">
+        <a class="btn-add" href="${FORM_CADASTRO_MORADOR}" target="_blank">
+          <div class="ico">➕</div>
+          <div><div class="nome">Cadastrar novo morador</div><div class="desc">Registrar um novo residente</div></div>
+          <div class="seta">→</div>
+        </a>
+      </div>
+      <div class="titulo-sec" style="padding:20px 20px 4px;font-size:15px;font-weight:700;color:var(--teal-esc);display:flex;align-items:center;gap:8px">👥 Moradores <span class="qtd" id="contador" style="margin-left:auto;font-size:11.5px;font-weight:600;color:var(--muted);background:#eaf3f2;padding:3px 9px;border-radius:20px">–</span></div>
+      <div id="lista" class="wrap"><div class="estado"><div class="spin"></div>Buscando moradores...</div></div>
+      <div class="rodape">Village Viver Bem · Residencial Care · Farmácia por Morador v1</div>
+    `;
+    carregarMoradores();
+  }
+
+  window.carregarMoradores = async function(){
+    document.getElementById('quando').textContent = 'Atualizando...';
+    try{
+      const moradores = await api('moradores?select=*&order=nome');
+      const el = document.getElementById('lista');
+      document.getElementById('contador').textContent = moradores.length + (moradores.length===1?' morador':' moradores');
+      if(!moradores.length){
+        el.innerHTML = '<div class="estado">Nenhum morador cadastrado ainda.<br>Toque em "Cadastrar novo morador" acima.</div>';
+      }else{
+        let html = '';
+        moradores.forEach(m=>{
+          const nome = (m.nome||'—').toString().trim();
+          const quarto = m.quarto ? ('Quarto ' + String(m.quarto).trim()) : 'Sem quarto';
+          html += `<div class="morador">
+            <div class="av">${iniciais(nome)}</div>
+            <div><div class="nome">${nome}</div><div class="quarto">🚪 ${quarto}</div></div>
+          </div>`;
+        });
+        el.innerHTML = html;
+      }
+      const agora = new Date();
+      document.getElementById('quando').textContent = 'Atualizado ' + agora.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+    }catch(e){
+      document.getElementById('lista').innerHTML = '<div class="estado">⚠️ Não consegui carregar os moradores.<br><small>('+e.message+')</small></div>';
+      document.getElementById('quando').textContent = 'Erro ao carregar';
+    }
+  };
+
+  // ---------- ROTEADOR ----------
+  function router(){
+    const hash = location.hash.replace('#','') || 'inicio';
+    if(hash === 'inicio') telaInicio();
+    else if(hash === 'estoque') telaEstoque();
+    else if(hash === 'moradores') telaMoradores();
+    else if(SETORES[hash]) telaSetor(hash);
+    else telaInicio();
+    window.scrollTo(0,0);
+  }
+  window.addEventListener('hashchange', router);
+  router();
+</script>
+</body>
+</html>
