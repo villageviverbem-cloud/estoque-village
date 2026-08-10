@@ -347,9 +347,14 @@
     });
   }
 
-  // Mantém o campo de leitura em foco (o leitor USB "digita" nele) mesmo se o usuário tocar na tela.
+  // Mantém o campo de leitura em foco (o leitor USB "digita" nele) mesmo se o usuário tocar na tela —
+  // mas só enquanto o formulário ainda não abriu. Depois que abre, o toque é pra preencher os campos
+  // (nome, lote, validade...), então não pode roubar o foco de volta, senão trava a digitação neles.
   // Registrado uma única vez, fora de telaLeitor, pra não empilhar um listener novo a cada visita.
-  document.addEventListener('click', ()=>{
+  document.addEventListener('click', (e)=>{
+    if(e.target.closest('input, select, textarea, button, a, label')) return;
+    const formEl = document.getElementById('leitor-form');
+    if(formEl && !formEl.classList.contains('oculto')) return;
     const i = document.getElementById('scan-input');
     if(i) i.focus();
   });
