@@ -490,16 +490,34 @@
     msg.textContent = 'Salvando...';
     try{
       const delta = tipo === 'entrada' ? qtd : -qtd;
-      if(produtoId !== null && produtoId !== undefined){
-        const atuais = await api('produtos?select=*&id=eq.'+encodeURIComponent(produtoId));
+      let idAlvo = produtoId;
+      if(idAlvo === null || idAlvo === undefined){
+        // Confere de novo bem na hora de salvar (não só quando escaneou) — evita cadastrar
+        // duplicado se o produto já foi criado nesse meio tempo (código de barras é único).
+        const achados = await api('produtos?select=id&codigo_barras=eq.'+encodeURIComponent(codigo));
+        if(achados[0]) idAlvo = achados[0].id;
+      }
+      if(idAlvo !== null && idAlvo !== undefined){
+        const atuais = await api('produtos?select=*&id=eq.'+encodeURIComponent(idAlvo));
         const produto = atuais[0];
         const novoEstoque = (Number(produto.estoque_atual)||0) + delta;
-        await apiWrite('produtos?id=eq.'+encodeURIComponent(produtoId), 'PATCH', {estoque_atual: novoEstoque, nome, unidade});
+        await apiWrite('produtos?id=eq.'+encodeURIComponent(idAlvo), 'PATCH', {estoque_atual: novoEstoque, nome, unidade});
       }else{
-        await apiWrite('produtos', 'POST', {
-          nome, unidade, setor: setorChave, codigo_barras: codigo,
-          estoque_atual: delta, estoque_minimo: 0
-        });
+        try{
+          await apiWrite('produtos', 'POST', {
+            nome, unidade, setor: setorChave, codigo_barras: codigo,
+            estoque_atual: delta, estoque_minimo: 0
+          });
+        }catch(erroPost){
+          // Se ainda assim bateu de novo numa duplicidade (corrida entre duas leituras ao
+          // mesmo tempo, por exemplo), busca o que já existe e atualiza em vez de falhar.
+          if(!/codigo_barras/i.test(erroPost.message)) throw erroPost;
+          const achados2 = await api('produtos?select=*&codigo_barras=eq.'+encodeURIComponent(codigo));
+          const existente = achados2[0];
+          if(!existente) throw erroPost;
+          const novoEstoque = (Number(existente.estoque_atual)||0) + delta;
+          await apiWrite('produtos?id=eq.'+encodeURIComponent(existente.id), 'PATCH', {estoque_atual: novoEstoque, nome, unidade});
+        }
       }
       await apiWrite('movimentacoes', 'POST', {
         tipo, produto_nome: nome, codigo_barras: codigo, setor: setorChave,
