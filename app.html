@@ -886,18 +886,23 @@
       moradorNomeCache[m.id] = m.nome;
       document.getElementById('mf-nome').textContent = m.nome || '—';
       const acoes = [
-        {chave:'agua', ico:'💧', bg:'#eaf1fb', cor:'#4a6fa5', nome:'Bebeu água / Hidratação', desc:'Registrar copos de água'},
-        {chave:'fralda', ico:'🧷', bg:'#fdecec', cor:'#c85a5a', nome:'Checar / Trocar fralda', desc:'Registrar situação e troca'},
-        {chave:'alimentacao', ico:'🍽️', bg:'#fef2e8', cor:'#c77b3b', nome:'Alimentação', desc:'Registrar refeição e aceitação'},
-        {chave:'katz', ico:'📋', bg:'#f0ecfb', cor:'#7a5fb0', nome:'Escala de Katz', desc:'Avaliação de dependência (AVDs)'}
+        {chave:'agua', hashBase:'registrar-agua', editavel:true, ico:'💧', bg:'#eaf1fb', cor:'#4a6fa5', nome:'Bebeu água / Hidratação', desc:'Registrar copos de água'},
+        {chave:'fralda', hashBase:'registrar-fralda', editavel:true, ico:'🧷', bg:'#fdecec', cor:'#c85a5a', nome:'Checar / Trocar fralda', desc:'Registrar situação e troca'},
+        {chave:'alimentacao', hashBase:'registrar-alimentacao', editavel:true, ico:'🍽️', bg:'#fef2e8', cor:'#c77b3b', nome:'Alimentação', desc:'Registrar refeição e aceitação'},
+        {chave:'higiene', hashBase:'registrar-higiene', editavel:true, ico:'🛁', bg:'#e8f4f4', cor:'#2f6f6e', nome:'Higiene / Banho', desc:'Registrar tipo de banho/higiene'},
+        {chave:'decubito', hashBase:'registrar-decubito', editavel:true, ico:'🔄', bg:'#eaf1fb', cor:'#4a6fa5', nome:'Mudança de decúbito', desc:'Registrar posição'},
+        {chave:'anotacao', hashBase:'anotacao', editavel:false, ico:'📝', bg:'#f0f0f0', cor:'#607080', nome:'Anotação livre', desc:'Escrever uma observação'},
+        {chave:'vitais', hashBase:'vitais', editavel:false, ico:'❤️', bg:'#fdecec', cor:'#c85a5a', nome:'Sinais Vitais', desc:'Registrar pressão, temperatura etc.'},
+        {chave:'evolucao', hashBase:'evolucao', editavel:false, ico:'📔', bg:'#fef2e8', cor:'#c77b3b', nome:'Evolução Diária', desc:'Registrar evolução do turno'},
+        {chave:'katz', hashBase:'katz', editavel:true, ico:'📋', bg:'#f0ecfb', cor:'#7a5fb0', nome:'Escala de Katz', desc:'Avaliação de dependência (AVDs)'}
       ];
       area.innerHTML = `
         <div class="opcoes">
           ${acoes.map(a => `
-            <div class="opcao js-abrir-acao" data-hash="${a.chave === 'katz' ? 'katz' : 'registrar-'+a.chave}-${esc(id)}" style="cursor:pointer">
+            <div class="opcao js-abrir-acao" data-hash="${a.hashBase}-${esc(id)}" style="cursor:pointer">
               <div class="ico" style="background:${a.bg};color:${a.cor}">${a.ico}</div>
               <div class="txt"><div class="nome">${a.nome}</div><div class="desc">${a.desc}</div></div>
-              <a class="btn-scan" href="#editar-${a.chave}-${esc(id)}" data-stop="1" style="margin-right:8px">✏️ Editar</a>
+              ${a.editavel ? `<a class="btn-scan" href="#editar-${a.chave}-${esc(id)}" data-stop="1" style="margin-right:8px">✏️ Editar</a>` : ''}
               <div class="seta" style="color:var(--teal)">→</div>
             </div>
           `).join('')}
@@ -920,23 +925,29 @@
 
   async function carregarHistoricoCuidado(id, token){
     try{
-      const [regsResult, katzResult] = await Promise.allSettled([
+      const [regsResult, katzResult, vitaisResult, evolucaoResult] = await Promise.allSettled([
         api('registros_cuidado?select=*&morador_id=eq.'+encodeURIComponent(id)+'&order=data_hora.desc&limit=15'),
-        api('avaliacoes_katz?select=*&morador_id=eq.'+encodeURIComponent(id)+'&order=data_hora.desc&limit=15')
+        api('avaliacoes_katz?select=*&morador_id=eq.'+encodeURIComponent(id)+'&order=data_hora.desc&limit=15'),
+        api('sinais_vitais?select=*&morador_id=eq.'+encodeURIComponent(id)+'&order=data_hora.desc&limit=15'),
+        api('evolucoes_diarias?select=*&morador_id=eq.'+encodeURIComponent(id)+'&order=data_hora.desc&limit=15')
       ]);
       // Cada tabela é buscada de forma independente: se uma ainda não existir
-      // (ex: avaliacoes_katz não criada ainda), a outra continua aparecendo normal.
+      // (ex: alguma tabela nova não criada ainda), as outras continuam aparecendo normal.
       const regs = regsResult.status === 'fulfilled' ? regsResult.value : [];
       const katz = katzResult.status === 'fulfilled' ? katzResult.value : [];
+      const vitais = vitaisResult.status === 'fulfilled' ? vitaisResult.value : [];
+      const evolucao = evolucaoResult.status === 'fulfilled' ? evolucaoResult.value : [];
       if(token !== viewToken) return;
       const el = document.getElementById('mf-historico');
       if(!el) return;
       const itens = [
         ...regs.map(r => ({tipo: r.tipo, valor: r.valor, quem: r.funcionario_nome, data_hora: r.data_hora})),
-        ...katz.map(k => ({tipo: 'katz', valor: 'Escala de Katz — ' + (k.classificacao||'') + ' (' + (k.escore_total ?? '—') + '/6)', quem: k.avaliador, data_hora: k.data_hora}))
+        ...katz.map(k => ({tipo: 'katz', valor: 'Escala de Katz — ' + (k.classificacao||'') + ' (' + (k.escore_total ?? '—') + '/6)', quem: k.avaliador, data_hora: k.data_hora})),
+        ...vitais.map(v => ({tipo: 'vitais', valor: 'Sinais vitais — PA ' + (v.pa_sistolica ?? '—') + '/' + (v.pa_diastolica ?? '—') + (v.alertas ? ' ⚠️ ' + v.alertas : ''), quem: v.funcionario_nome, data_hora: v.data_hora})),
+        ...evolucao.map(e => ({tipo: 'evolucao', valor: 'Evolução — ' + (e.turno || 'turno não informado'), quem: e.funcionario_nome, data_hora: e.data_hora}))
       ].sort((a,b) => new Date(b.data_hora) - new Date(a.data_hora)).slice(0, 15);
       if(!itens.length){ el.innerHTML = '<div class="estado">Nenhum registro ainda.</div>'; return; }
-      const icones = {agua:'💧', fralda:'🧷', alimentacao:'🍽️', katz:'📋'};
+      const icones = {agua:'💧', fralda:'🧷', alimentacao:'🍽️', katz:'📋', higiene:'🛁', decubito:'🔄', anotacao:'📝', vitais:'❤️', evolucao:'📔'};
       el.innerHTML = itens.map(r=>{
         const d = r.data_hora ? new Date(r.data_hora) : null;
         const dstr = d ? d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+' às '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) : '';
@@ -966,6 +977,16 @@
       titulo: '🧷 Checar / Trocar fralda', cor: '#c85a5a',
       pergunta: 'Situação',
       opcoes: ['Seca - sem troca','Molhada - trocada','Suja - trocada e higienizada']
+    },
+    higiene: {
+      titulo: '🛁 Higiene / Banho', cor: '#2f6f6e',
+      pergunta: 'Tipo',
+      opcoes: ['Banho completo','Banho no leito','Higiene íntima','Troca de roupa']
+    },
+    decubito: {
+      titulo: '🔄 Mudança de decúbito', cor: '#4a6fa5',
+      pergunta: 'Posição',
+      opcoes: ['Decúbito dorsal','Decúbito lateral direito','Decúbito lateral esquerdo','Sentado / Cadeira de rodas']
     }
   };
   let cuidadoSelecionado = null;
@@ -1187,6 +1208,221 @@
     }
   }
 
+  // ---------- ANOTAÇÃO LIVRE ----------
+  function telaAnotacao(moradorId){
+    const hashAtual = 'anotacao-' + moradorId;
+    if(!exigirFuncionario(hashAtual)) return;
+    app.innerHTML = `
+      <div class="topo" style="background:linear-gradient(120deg,#708090,#556270)">
+        <button class="voltar" id="btn-voltar-morador">← Voltar</button>
+        <h1>📝 Anotação livre</h1>
+      </div>
+      ${bannerFuncionario(hashAtual)}
+      <div class="wrap">
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin-bottom:4px">Anotação</label>
+        <textarea id="an-texto" rows="5" placeholder="Descreva..." style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px"></textarea>
+        <button id="an-salvar" style="width:100%;background:#556270;color:#fff;border:none;border-radius:14px;padding:14px;font-size:15px;font-weight:700;margin-top:14px">Salvar anotação</button>
+        <div id="an-msg" style="text-align:center;font-size:12.5px;color:var(--muted);margin-top:10px"></div>
+      </div>
+    `;
+    document.getElementById('btn-voltar-morador').addEventListener('click', () => { location.hash = 'morador-' + moradorId; });
+    document.getElementById('an-salvar').addEventListener('click', () => salvarAnotacao(moradorId));
+  }
+
+  async function salvarAnotacao(moradorId){
+    const msg = document.getElementById('an-msg');
+    const texto = document.getElementById('an-texto').value.trim();
+    if(!texto){ msg.textContent = 'Escreva alguma coisa antes de salvar.'; return; }
+    const f = funcionarioAtual();
+    if(!f){ location.hash = 'funcionarios?v=' + encodeURIComponent('anotacao-'+moradorId); return; }
+    msg.textContent = 'Salvando...';
+    const btn = document.getElementById('an-salvar');
+    if(btn) btn.disabled = true;
+    try{
+      const moradorNome = await nomeDoMorador(moradorId);
+      await apiWrite('registros_cuidado', 'POST', {
+        morador_id: moradorId, morador_nome: moradorNome, tipo: 'anotacao', valor: texto,
+        observacao: null, funcionario_id: f.id, funcionario_nome: f.nome,
+        data_hora: new Date().toISOString()
+      });
+      location.hash = 'morador-' + moradorId;
+    }catch(e){
+      msg.textContent = '⚠️ Erro: ' + esc(e.message) + '.';
+    }finally{
+      if(btn) btn.disabled = false;
+    }
+  }
+
+  // ---------- SINAIS VITAIS ----------
+  const VITAIS_CONSCIENCIA = ['Alerta','Sonolento','Confuso','Torporoso','Comatoso'];
+
+  function telaVitais(moradorId){
+    const hashAtual = 'vitais-' + moradorId;
+    if(!exigirFuncionario(hashAtual)) return;
+    app.innerHTML = `
+      <div class="topo" style="background:linear-gradient(120deg,#d46a6a,#c85a5a)">
+        <button class="voltar" id="btn-voltar-morador">← Voltar</button>
+        <h1>❤️ Sinais Vitais</h1>
+        <p>Números precisam ser digitados; o resto é por toque</p>
+      </div>
+      ${bannerFuncionario(hashAtual)}
+      <div class="wrap">
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:8px 0 4px">PA Sistólica (mmHg)</label>
+        <input id="vt-sist" type="number" min="0" max="300" placeholder="Ex.: 120" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">PA Diastólica (mmHg)</label>
+        <input id="vt-diast" type="number" min="0" max="200" placeholder="Ex.: 80" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">Temperatura (°C)</label>
+        <input id="vt-temp" type="number" step="0.1" min="25" max="45" placeholder="Ex.: 36.5" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">Saturação O₂ (%)</label>
+        <input id="vt-sato2" type="number" min="0" max="100" placeholder="Ex.: 97" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">Glicemia (mg/dL)</label>
+        <input id="vt-glic" type="number" min="0" max="700" placeholder="Ex.: 100" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">Freq. Cardíaca (bpm)</label>
+        <input id="vt-fc" type="number" min="0" max="250" placeholder="Ex.: 78" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">Freq. Respiratória (irpm)</label>
+        <input id="vt-fr" type="number" min="0" max="80" placeholder="Ex.: 16" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">Peso (kg)</label>
+        <input id="vt-peso" type="number" step="0.1" min="0" max="400" placeholder="Ex.: 68.5" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">
+
+        <div style="font-size:14px;font-weight:600;color:var(--teal-esc);margin:16px 0 10px">Dor (0–10)</div>
+        <div class="chip-opcoes" id="vt-dor">
+          ${Array.from({length:11},(_,n)=>n).map(n=>`<div class="chip" data-valor="${n}">${n}</div>`).join('')}
+        </div>
+        <div style="font-size:14px;font-weight:600;color:var(--teal-esc);margin:16px 0 10px">Nível de consciência</div>
+        <div class="chip-opcoes" id="vt-consciencia">
+          ${VITAIS_CONSCIENCIA.map(o=>`<div class="chip" data-valor="${esc(o)}">${esc(o)}</div>`).join('')}
+        </div>
+
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:14px 0 4px">Observação (opcional)</label>
+        <textarea id="vt-obs" rows="2" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px"></textarea>
+        <button id="vt-salvar" style="width:100%;background:#c85a5a;color:#fff;border:none;border-radius:14px;padding:14px;font-size:15px;font-weight:700;margin-top:14px">💾 Salvar sinais vitais</button>
+        <div id="vt-msg" style="text-align:center;font-size:12.5px;color:var(--muted);margin-top:10px"></div>
+      </div>
+    `;
+    document.getElementById('btn-voltar-morador').addEventListener('click', () => { location.hash = 'morador-' + moradorId; });
+    let dorEscolhida = null, conscienciaEscolhida = null;
+    ligarChips('vt-dor', v => dorEscolhida = v);
+    ligarChips('vt-consciencia', v => conscienciaEscolhida = v);
+    document.getElementById('vt-salvar').addEventListener('click', () => salvarVitais(moradorId, () => dorEscolhida, () => conscienciaEscolhida));
+  }
+
+  function calcularAlertasVitais(v){
+    const alertas = [];
+    if(v.pa_sistolica !== null && (v.pa_sistolica > 140 || v.pa_sistolica < 90)) alertas.push('PA sistólica');
+    if(v.pa_diastolica !== null && (v.pa_diastolica > 90 || v.pa_diastolica < 60)) alertas.push('PA diastólica');
+    if(v.temperatura !== null && (v.temperatura > 37.8 || v.temperatura < 35)) alertas.push('Temperatura');
+    if(v.sato2 !== null && (v.sato2 < 92 || v.sato2 > 100)) alertas.push('Saturação fora do normal');
+    if(v.glicemia !== null && (v.glicemia > 180 || v.glicemia < 70)) alertas.push('Glicemia');
+    if(v.freq_cardiaca !== null && (v.freq_cardiaca > 100 || v.freq_cardiaca < 60)) alertas.push('Freq. cardíaca');
+    if(v.freq_respiratoria !== null && (v.freq_respiratoria > 24 || v.freq_respiratoria < 12)) alertas.push('Freq. respiratória');
+    if(v.dor !== null && v.dor >= 7) alertas.push('Dor alta');
+    return alertas.join(', ') || null;
+  }
+
+  async function salvarVitais(moradorId, getDor, getConsciencia){
+    const msg = document.getElementById('vt-msg');
+    const f = funcionarioAtual();
+    if(!f){ location.hash = 'funcionarios?v=' + encodeURIComponent('vitais-'+moradorId); return; }
+    const num = id => { const v = document.getElementById(id).value; return v === '' ? null : Number(v); };
+    const dados = {
+      pa_sistolica: num('vt-sist'), pa_diastolica: num('vt-diast'), temperatura: num('vt-temp'),
+      sato2: num('vt-sato2'), glicemia: num('vt-glic'), freq_cardiaca: num('vt-fc'),
+      freq_respiratoria: num('vt-fr'), peso: num('vt-peso'),
+      dor: getDor() !== null ? Number(getDor()) : null, nivel_consciencia: getConsciencia()
+    };
+    const algumPreenchido = Object.values(dados).some(v => v !== null && v !== undefined);
+    if(!algumPreenchido){ msg.textContent = 'Preencha ao menos um valor.'; return; }
+    msg.textContent = 'Salvando...';
+    const btn = document.getElementById('vt-salvar');
+    if(btn) btn.disabled = true;
+    try{
+      const moradorNome = await nomeDoMorador(moradorId);
+      const obs = document.getElementById('vt-obs').value.trim();
+      await apiWrite('sinais_vitais', 'POST', {
+        morador_id: moradorId, morador_nome: moradorNome, ...dados,
+        observacao: obs || null, alertas: calcularAlertasVitais(dados),
+        funcionario_id: f.id, funcionario_nome: f.nome, data_hora: new Date().toISOString()
+      });
+      location.hash = 'morador-' + moradorId;
+    }catch(e){
+      msg.textContent = '⚠️ Erro: ' + esc(e.message) + '. Se a tabela "sinais_vitais" não existe, rode o SQL que te mandei.';
+    }finally{
+      if(btn) btn.disabled = false;
+    }
+  }
+
+  // ---------- EVOLUÇÃO DIÁRIA ----------
+  const EVOLUCAO_CAMPOS = [
+    {chave:'turno', label:'Turno', opcoes:['Manhã','Tarde','Noite']},
+    {chave:'aceitacao_alimentar', label:'Aceitação alimentar', opcoes:['Aceitou tudo','Aceitou parcial','Recusou']},
+    {chave:'hidratacao', label:'Hidratação', opcoes:['Boa','Regular','Ruim']},
+    {chave:'evacuacao', label:'Evacuação', opcoes:['Presente - normal','Presente - alterada','Ausente']},
+    {chave:'diurese', label:'Diurese', opcoes:['Presente - normal','Presente - alterada','Ausente']},
+    {chave:'humor', label:'Humor / Estado', opcoes:['Calmo','Agitado','Deprimido','Ansioso']},
+    {chave:'sono', label:'Sono', opcoes:['Dormiu bem','Sono agitado','Insônia']},
+    {chave:'higiene', label:'Higiene', opcoes:['Banho realizado','Higiene parcial','Recusou banho']},
+    {chave:'mobilidade', label:'Mobilidade', opcoes:['Cadeira de rodas','Deambulando','Acamado']},
+    {chave:'pele', label:'Pele', opcoes:['Íntegra','Alterada / Lesão']}
+  ];
+  let evolucaoRespostas = {};
+
+  function telaEvolucao(moradorId){
+    const hashAtual = 'evolucao-' + moradorId;
+    if(!exigirFuncionario(hashAtual)) return;
+    evolucaoRespostas = {};
+    app.innerHTML = `
+      <div class="topo" style="background:linear-gradient(120deg,#e8933f,#c77b3b)">
+        <button class="voltar" id="btn-voltar-morador">← Voltar</button>
+        <h1>📔 Evolução Diária</h1>
+        <p>Opções aproximadas do que já é usado — corrija se faltar alguma</p>
+      </div>
+      ${bannerFuncionario(hashAtual)}
+      <div class="wrap">
+        ${EVOLUCAO_CAMPOS.map(c => `
+          <div style="font-size:14px;font-weight:600;color:var(--teal-esc);margin:14px 0 8px">${c.label}</div>
+          <div class="chip-opcoes" id="ev-${c.chave}">
+            ${c.opcoes.map(o=>`<div class="chip" data-valor="${esc(o)}">${esc(o)}</div>`).join('')}
+          </div>
+        `).join('')}
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:14px 0 4px">Observações / Evolução do turno</label>
+        <textarea id="ev-obs" rows="3" placeholder="Descreva como o residente passou o turno, intercorrências, condutas..." style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px"></textarea>
+        <button id="ev-salvar" style="width:100%;background:#c77b3b;color:#fff;border:none;border-radius:14px;padding:14px;font-size:15px;font-weight:700;margin-top:14px">💾 Salvar evolução</button>
+        <div id="ev-msg" style="text-align:center;font-size:12.5px;color:var(--muted);margin-top:10px"></div>
+      </div>
+    `;
+    document.getElementById('btn-voltar-morador').addEventListener('click', () => { location.hash = 'morador-' + moradorId; });
+    EVOLUCAO_CAMPOS.forEach(c => {
+      ligarChips('ev-' + c.chave, v => { evolucaoRespostas[c.chave] = v; });
+    });
+    document.getElementById('ev-salvar').addEventListener('click', () => salvarEvolucao(moradorId));
+  }
+
+  async function salvarEvolucao(moradorId){
+    const msg = document.getElementById('ev-msg');
+    const f = funcionarioAtual();
+    if(!f){ location.hash = 'funcionarios?v=' + encodeURIComponent('evolucao-'+moradorId); return; }
+    if(!evolucaoRespostas.turno){ msg.textContent = 'Escolha pelo menos o turno.'; return; }
+    msg.textContent = 'Salvando...';
+    const btn = document.getElementById('ev-salvar');
+    if(btn) btn.disabled = true;
+    try{
+      const moradorNome = await nomeDoMorador(moradorId);
+      const obs = document.getElementById('ev-obs').value.trim();
+      const dados = {};
+      EVOLUCAO_CAMPOS.forEach(c => { dados[c.chave] = evolucaoRespostas[c.chave] || null; });
+      await apiWrite('evolucoes_diarias', 'POST', {
+        morador_id: moradorId, morador_nome: moradorNome, ...dados,
+        observacoes: obs || null, funcionario_id: f.id, funcionario_nome: f.nome,
+        data_hora: new Date().toISOString()
+      });
+      location.hash = 'morador-' + moradorId;
+    }catch(e){
+      msg.textContent = '⚠️ Erro: ' + esc(e.message) + '. Se a tabela "evolucoes_diarias" não existe, rode o SQL que te mandei.';
+    }finally{
+      if(btn) btn.disabled = false;
+    }
+  }
+
   // ---------- ESCALA DE KATZ ----------
   const KATZ_ITENS = [
     {chave:'banho', label:'Banho'},
@@ -1354,11 +1590,18 @@
     else if(hash === 'funcionarios-novo') telaFuncionarioNovo();
     else if((m = apósPrefixo(hash, 'editar-agua-')) !== null) telaRegistrarSimples('agua', m, true);
     else if((m = apósPrefixo(hash, 'editar-fralda-')) !== null) telaRegistrarSimples('fralda', m, true);
+    else if((m = apósPrefixo(hash, 'editar-higiene-')) !== null) telaRegistrarSimples('higiene', m, true);
+    else if((m = apósPrefixo(hash, 'editar-decubito-')) !== null) telaRegistrarSimples('decubito', m, true);
     else if((m = apósPrefixo(hash, 'editar-alimentacao-')) !== null) telaRegistrarAlimentacao(m, true);
     else if((m = apósPrefixo(hash, 'editar-katz-')) !== null) telaKatz(m, true);
     else if((m = apósPrefixo(hash, 'registrar-agua-')) !== null) telaRegistrarSimples('agua', m);
     else if((m = apósPrefixo(hash, 'registrar-fralda-')) !== null) telaRegistrarSimples('fralda', m);
+    else if((m = apósPrefixo(hash, 'registrar-higiene-')) !== null) telaRegistrarSimples('higiene', m);
+    else if((m = apósPrefixo(hash, 'registrar-decubito-')) !== null) telaRegistrarSimples('decubito', m);
     else if((m = apósPrefixo(hash, 'registrar-alimentacao-')) !== null) telaRegistrarAlimentacao(m);
+    else if((m = apósPrefixo(hash, 'anotacao-')) !== null) telaAnotacao(m);
+    else if((m = apósPrefixo(hash, 'vitais-')) !== null) telaVitais(m);
+    else if((m = apósPrefixo(hash, 'evolucao-')) !== null) telaEvolucao(m);
     else if((m = apósPrefixo(hash, 'katz-')) !== null) telaKatz(m);
     else if((m = apósPrefixo(hash, 'morador-')) !== null) telaMoradorFicha(m);
     else if(SETORES[hash]) telaSetor(hash);
