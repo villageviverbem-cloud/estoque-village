@@ -101,6 +101,9 @@
   .chip-opcoes{display:flex;flex-wrap:wrap;gap:9px}
   .chip{padding:10px 16px;border-radius:20px;border:1px solid var(--borda);background:#fff;font-size:13.5px;font-weight:600;color:var(--txt);cursor:pointer}
   .chip.sel{background:var(--teal);color:#fff;border-color:var(--teal)}
+  .chip.chip-full{display:flex;align-items:flex-start;gap:10px;width:100%;text-align:left;padding:12px 14px;border-radius:12px;font-size:13px;line-height:1.45;margin-bottom:8px}
+  .chip.chip-full::before{content:'☐';font-size:17px;flex-shrink:0;line-height:1.3}
+  .chip.chip-full.sel::before{content:'☑';color:#fff}
   .pin-btn{aspect-ratio:1;border-radius:16px;border:1px solid var(--borda);background:#fff;font-size:22px;font-weight:700;color:var(--txt)}
   .pin-btn:active{background:var(--teal);color:#fff}
 
@@ -1424,21 +1427,34 @@
   }
 
   // ---------- ESCALA DE KATZ ----------
+  // Texto oficial da Escala de Katz modificada (AVD) — cada item vira dois
+  // quadradinhos com a descrição clínica completa, em vez de "Independente/Dependente" genérico.
   const KATZ_ITENS = [
-    {chave:'banho', label:'Banho'},
-    {chave:'vestir', label:'Vestir-se'},
-    {chave:'banheiro', label:'Uso do banheiro'},
-    {chave:'transferencia', label:'Transferência'},
-    {chave:'continencia', label:'Continência'},
-    {chave:'alimentacao', label:'Alimentação'}
+    {chave:'alimentacao', label:'Comer',
+      texto1:'Come sem assistência (os alimentos podem ser preparados e servidos por outra pessoa; leva o alimento à boca sem ajuda)',
+      texto0:'Precisa de assistência parcial ou completa para comer, ou é alimentado por via intravenosa'},
+    {chave:'vestir', label:'Vestir-se',
+      texto1:'Pega as roupas sozinho e se veste, inclusive casacos com fechos (pode precisar de ajuda só pra amarrar os sapatos)',
+      texto0:'Necessita de ajuda para se vestir, ou precisa ser vestido'},
+    {chave:'banho', label:'Tomar banho',
+      texto1:'Toma banho sozinho, ou só precisa de ajuda pra lavar uma parte do corpo (costas, região genital ou um membro)',
+      texto0:'Precisa de assistência pra lavar mais de uma parte do corpo, entrar/sair do banho, ou assistência total'},
+    {chave:'transferencia', label:'Transferência (cama / cadeira)',
+      texto1:'Deita e levanta da cama ou cadeira sem assistência (pode usar apoios/auxiliares mecânicos)',
+      texto0:'Precisa de ajuda pra passar da cama pra cadeira, ou é totalmente dependente nessa transferência'},
+    {chave:'banheiro', label:'Ir ao banheiro',
+      texto1:'Vai ao banheiro, faz as necessidades, arruma as roupas e se limpa sem ajuda',
+      texto0:'Precisa de ajuda pra ir ao banheiro, se limpar, ou usar urinol/comadre/vaso sanitário'},
+    {chave:'continencia', label:'Continência',
+      texto1:'Controle completo da bexiga e do intestino (sem acidentes ocasionais)',
+      texto0:'Apresenta incontinência parcial ou total, intestinal ou vesical'}
   ];
   let katzRespostas = {};
   let katzEditandoId = null;
 
   function classificarKatz(escore){
     if(escore === 6) return 'Independente';
-    if(escore >= 4) return 'Dependência moderada';
-    if(escore >= 3) return 'Dependência parcial';
+    if(escore >= 4) return 'Comprometimento moderado';
     return 'Muito dependente';
   }
 
@@ -1456,10 +1472,10 @@
       ${bannerFuncionario(hashAtual)}
       <div class="wrap">
         ${KATZ_ITENS.map(it => `
-          <div style="font-size:14px;font-weight:600;color:var(--teal-esc);margin:14px 0 8px">${it.label}</div>
-          <div class="chip-opcoes" id="katz-${it.chave}">
-            <div class="chip" data-valor="1">✅ Independente</div>
-            <div class="chip" data-valor="0">🆘 Dependente</div>
+          <div style="font-size:15px;font-weight:700;color:var(--teal-esc);margin:16px 0 8px">${esc(it.label)}</div>
+          <div id="katz-${it.chave}">
+            <div class="chip chip-full" data-valor="1">${esc(it.texto1)}</div>
+            <div class="chip chip-full" data-valor="0">${esc(it.texto0)}</div>
           </div>
         `).join('')}
         <div style="display:flex;justify-content:space-between;align-items:center;margin:20px 0 6px">
