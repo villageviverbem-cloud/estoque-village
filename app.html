@@ -137,6 +137,13 @@
   // Moradores e Equipe são abertos direto do menu do ILPI, na mesma aba, então o
   // "Voltar" delas leva de volta pro ILPI em vez de para o início deste app.
   const ILPI_URL = 'https://eduardonoronha9.app.n8n.cloud/webhook/ilpi';
+  // Painéis reais de estoque do n8n que o Leitor manda direto (sem passar pelas
+  // tabelas produtos/movimentacoes deste app) — mesmo espírito da integração com
+  // o Prontuário: usa o "contrato" (campos de URL) que cada painel já espera.
+  const FARMACIA_INSUMOS_URL = 'https://eduardonoronha9.app.n8n.cloud/webhook/estoque-insumos';
+  const COZINHA_PAINEL_URL = 'https://eduardonoronha9.app.n8n.cloud/webhook/estoque-cozinha-painel';
+  const LAVANDERIA_PAINEL_URL = 'https://eduardonoronha9.app.n8n.cloud/webhook/lavanderia-painel';
+  const SETORES_INTEGRADOS = ['farmacia', 'cozinha', 'lavanderia'];
   function voltarParaIlpi(){
     location.href = ILPI_URL;
   }
@@ -334,13 +341,16 @@
   function telaLeitor(chave){
     const s = SETORES[chave];
     if(!s){ location.hash = 'inicio'; return; }
+    const integrado = SETORES_INTEGRADOS.includes(chave);
+    if(integrado && !exigirFuncionario('leitor-'+chave)) return;
     leitorSalvando = false;
     app.innerHTML = `
       <div class="topo" style="background:linear-gradient(120deg,${s.grad[0]},${s.grad[1]})">
         <button class="voltar" onclick="voltarParaIlpi()">← Voltar</button>
         <h1>📷 Leitor — ${s.nome}</h1>
-        <p>Aponte o leitor pro código de barras</p>
+        <p>${integrado ? 'Vai direto pro painel de estoque real desse setor' : 'Aponte o leitor pro código de barras'}</p>
       </div>
+      ${integrado ? bannerFuncionario('leitor-'+chave) : ''}
       <div style="padding:20px 16px 4px">
         <input id="scan-input" type="text" autocomplete="off" placeholder="Aguardando leitura..." style="width:100%;border:2px solid ${s.cor};border-radius:14px;padding:16px;font-size:16px;text-align:center;background:#fff">
       </div>
@@ -421,6 +431,16 @@
     formEl.classList.remove('oculto');
     const nome = produto ? produto.nome : nomeSugerido;
     const unidade = produto ? (produto.unidade || 'un') : 'un';
+    // Cada setor integrado (farmácia = insumos, cozinha, lavanderia) manda pro painel real do
+    // n8n com o formato de campos que cada um já espera — por isso os campos mostrados mudam
+    // por setor. Secretaria/Enfermagem (sem painel real ainda) seguem no formato genérico antigo.
+    const ehLavanderia = setorChave === 'lavanderia';
+    const ehCozinha = setorChave === 'cozinha';
+    const ehFarmacia = setorChave === 'farmacia';
+    const mostrarUnidade = !ehLavanderia;
+    const mostrarLote = !ehLavanderia && !ehCozinha;
+    const mostrarValidade = !ehLavanderia;
+    const mostrarMorador = ehLavanderia || (!ehCozinha && !ehFarmacia);
     formEl.innerHTML = `
       <div class="item" style="margin-bottom:14px">
         <div>
@@ -433,23 +453,23 @@
         const nomeSetor = chaveEncontrada ? SETORES[chaveEncontrada].nome : produto.setor;
         return `<div style="background:#fff6e0;color:#8a6000;border-radius:10px;padding:10px 12px;margin-bottom:14px;font-size:13px">⚠️ Esse código já está cadastrado no setor <b>${esc(nomeSetor)}</b>. O código de barras é único no sistema, então essa movimentação vai atualizar o mesmo produto.</div>`;
       })() : ''}
-      <label style="font-size:12.5px;color:var(--muted);display:block;margin-bottom:4px">Nome do produto</label>
-      <input id="f-nome" type="text" value="${esc(nome)}" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;margin-bottom:12px;font-size:14px">
-      <label style="font-size:12.5px;color:var(--muted);display:block;margin-bottom:4px">Unidade (ex: un, cx, kg)</label>
-      <input id="f-unidade" type="text" value="${esc(unidade)}" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;margin-bottom:12px;font-size:14px">
-      <label style="font-size:12.5px;color:var(--muted);display:block;margin-bottom:4px">Lote</label>
-      <input id="f-lote" type="text" placeholder="Opcional" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;margin-bottom:12px;font-size:14px">
-      <label style="font-size:12.5px;color:var(--muted);display:block;margin-bottom:4px">Validade (se tiver — não vem no código, precisa digitar)</label>
-      <input id="f-validade" type="date" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;margin-bottom:12px;font-size:14px">
+      <label style="font-size:12.5px;color:var(--muted);display:block;margin-bottom:4px">${ehLavanderia ? 'Peça de roupa' : 'Nome do produto'}</label>
+      <input id="f-nome" type="text" value="${esc(nome)}" placeholder="${ehLavanderia ? 'Ex.: Lençol, Calça' : ''}" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;margin-bottom:12px;font-size:14px">
+      ${mostrarUnidade ? `<label style="font-size:12.5px;color:var(--muted);display:block;margin-bottom:4px">Unidade (ex: un, cx, kg)</label>
+      <input id="f-unidade" type="text" value="${esc(unidade)}" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;margin-bottom:12px;font-size:14px">` : ''}
+      ${mostrarLote ? `<label style="font-size:12.5px;color:var(--muted);display:block;margin-bottom:4px">Lote</label>
+      <input id="f-lote" type="text" placeholder="Opcional" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;margin-bottom:12px;font-size:14px">` : ''}
+      ${mostrarValidade ? `<label style="font-size:12.5px;color:var(--muted);display:block;margin-bottom:4px">Validade (se tiver — não vem no código, precisa digitar)</label>
+      <input id="f-validade" type="date" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;margin-bottom:12px;font-size:14px">` : ''}
       <label style="font-size:12.5px;color:var(--muted);display:block;margin-bottom:4px">Quantidade</label>
       <input id="f-qtd" type="number" min="1" value="1" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;margin-bottom:14px;font-size:14px">
-      <label style="font-size:12.5px;color:var(--muted);display:block;margin-bottom:4px">Morador${setorChave==='farmacia' ? ' (de quem é a medicação)' : ' (opcional)'}</label>
+      ${mostrarMorador ? `<label style="font-size:12.5px;color:var(--muted);display:block;margin-bottom:4px">Morador${ehLavanderia ? '' : ' (opcional)'}</label>
       <select id="f-morador" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;margin-bottom:14px;font-size:14px">
         <option value="">Carregando moradores...</option>
-      </select>
+      </select>` : ''}
       <div style="display:flex;gap:10px;margin-bottom:14px">
-        <button id="f-entrada" class="aba ativa" style="flex:1" type="button">📥 Entrada</button>
-        <button id="f-saida" class="aba" style="flex:1" type="button">📤 Saída</button>
+        <button id="f-entrada" class="aba ativa" style="flex:1" type="button">${ehLavanderia ? '📤 Enviada p/ lavar' : '📥 Entrada'}</button>
+        <button id="f-saida" class="aba" style="flex:1" type="button">${ehLavanderia ? '📥 Devolvida (limpa)' : '📤 Saída'}</button>
       </div>
       <button id="f-salvar" style="width:100%;background:${s.cor};color:#fff;border:none;border-radius:14px;padding:14px;font-size:15px;font-weight:700">Salvar</button>
       <div id="f-msg" style="text-align:center;font-size:12.5px;color:var(--muted);margin-top:10px"></div>
@@ -460,15 +480,17 @@
     document.getElementById('f-salvar').addEventListener('click', ()=>{
       salvarMovimentoLeitor(codigo, setorChave, produto ? produto.id : null);
     });
-    buscarMoradoresLista().then(lista=>{
-      const sel = document.getElementById('f-morador');
-      if(!sel) return;
-      sel.innerHTML = '<option value="">— Nenhum / não se aplica —</option>' +
-        lista.map(m=>`<option value="${esc(m.nome)}">${esc(m.nome)}</option>`).join('');
-    }).catch(()=>{
-      const sel = document.getElementById('f-morador');
-      if(sel) sel.innerHTML = '<option value="">Não consegui carregar moradores</option>';
-    });
+    if(mostrarMorador){
+      buscarMoradoresLista().then(lista=>{
+        const sel = document.getElementById('f-morador');
+        if(!sel) return;
+        sel.innerHTML = '<option value="">— Nenhum / não se aplica —</option>' +
+          lista.map(m=>`<option value="${esc(m.nome)}">${esc(m.nome)}</option>`).join('');
+      }).catch(()=>{
+        const sel = document.getElementById('f-morador');
+        if(sel) sel.innerHTML = '<option value="">Não consegui carregar moradores</option>';
+      });
+    }
   }
 
   function setTipoMov(tipo){
@@ -481,13 +503,51 @@
     if(leitorSalvando) return;
     const msg = document.getElementById('f-msg');
     const nome = document.getElementById('f-nome').value.trim();
+    const qtd = Number(document.getElementById('f-qtd').value) || 0;
+    const tipo = window.__tipoMov || 'entrada';
+    if(!nome || qtd <= 0){ msg.textContent = 'Preencha nome e uma quantidade válida.'; return; }
+
+    if(setorChave === 'lavanderia'){
+      const moradorEl = document.getElementById('f-morador');
+      const morador = moradorEl ? moradorEl.value : '';
+      if(!morador){ msg.textContent = 'Escolha o morador.'; return; }
+      const f = funcionarioAtual();
+      msg.textContent = 'Abrindo o painel da Lavanderia...';
+      const usp = new URLSearchParams({
+        action: 'mov',
+        resident_or_sector: morador,
+        item_type: nome,
+        movement: tipo === 'entrada' ? 'enviada' : 'devolvida',
+        quantity: String(qtd),
+        handled_by: f ? f.nome : ''
+      });
+      location.href = LAVANDERIA_PAINEL_URL + '?' + usp.toString();
+      return;
+    }
+    if(setorChave === 'cozinha' || setorChave === 'farmacia'){
+      const unidadeEl = document.getElementById('f-unidade');
+      const validadeEl = document.getElementById('f-validade');
+      const loteEl = document.getElementById('f-lote');
+      const f = funcionarioAtual();
+      msg.textContent = 'Abrindo o painel de ' + (setorChave === 'cozinha' ? 'Cozinha' : 'Insumos') + '...';
+      const usp = new URLSearchParams();
+      usp.set('action', 'mov');
+      usp.set('movement', tipo);
+      usp.set(setorChave === 'cozinha' ? 'food_name' : 'item_name', nome);
+      if(unidadeEl && unidadeEl.value.trim()) usp.set('unit', unidadeEl.value.trim());
+      usp.set('quantity', String(qtd));
+      if(validadeEl && validadeEl.value) usp.set('expiry_date', validadeEl.value);
+      if(setorChave === 'farmacia' && loteEl && loteEl.value.trim()) usp.set('lote', loteEl.value.trim());
+      usp.set('updated_by', f ? f.nome : '');
+      location.href = (setorChave === 'cozinha' ? COZINHA_PAINEL_URL : FARMACIA_INSUMOS_URL) + '?' + usp.toString();
+      return;
+    }
+
+    // Secretaria/Enfermagem: ainda sem painel real ligado, segue gravando nas tabelas do próprio app.
     const unidade = document.getElementById('f-unidade').value.trim() || 'un';
     const lote = document.getElementById('f-lote').value.trim() || null;
     const validade = document.getElementById('f-validade').value || null;
-    const qtd = Number(document.getElementById('f-qtd').value) || 0;
     const residente = document.getElementById('f-morador').value || null;
-    const tipo = window.__tipoMov || 'entrada';
-    if(!nome || qtd <= 0){ msg.textContent = 'Preencha nome e uma quantidade válida.'; return; }
     leitorSalvando = true;
     const btn = document.getElementById('f-salvar');
     if(btn) btn.disabled = true;
