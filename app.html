@@ -380,7 +380,10 @@
     estado.classList.remove('oculto');
     estado.innerHTML = '<div class="spin"></div>Procurando "'+esc(codigo)+'"...';
     try{
-      const existentes = await api('produtos?select=*&codigo_barras=eq.'+encodeURIComponent(codigo)+'&setor=eq.'+encodeURIComponent(setorChave));
+      // Busca só pelo código de barras (sem filtrar setor): o banco só permite um produto
+      // por código de barras no total, então tem que achar antes de tentar cadastrar de novo,
+      // senão dá erro de duplicidade.
+      const existentes = await api('produtos?select=*&codigo_barras=eq.'+encodeURIComponent(codigo));
       if(token !== viewToken) return;
       const produto = existentes[0] || null;
       let nomeSugerido = '';
@@ -425,6 +428,7 @@
           <div class="sub">Código: ${esc(codigo)}${produto ? ' · Estoque atual: ' + (Number(produto.estoque_atual)||0) : ''}</div>
         </div>
       </div>
+      ${produto && produto.setor !== setorChave ? `<div style="background:#fff6e0;color:#8a6000;border-radius:10px;padding:10px 12px;margin-bottom:14px;font-size:13px">⚠️ Esse código já está cadastrado no setor <b>${esc(SETORES[produto.setor] ? SETORES[produto.setor].nome : produto.setor)}</b>. O código de barras é único no sistema, então essa movimentação vai atualizar o mesmo produto.</div>` : ''}
       <label style="font-size:12.5px;color:var(--muted);display:block;margin-bottom:4px">Nome do produto</label>
       <input id="f-nome" type="text" value="${esc(nome)}" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;margin-bottom:12px;font-size:14px">
       <label style="font-size:12.5px;color:var(--muted);display:block;margin-bottom:4px">Unidade (ex: un, cx, kg)</label>
