@@ -381,6 +381,14 @@
     }
   }
 
+  let moradoresListaCache = null;
+  async function buscarMoradoresLista(){
+    if(!moradoresListaCache){
+      moradoresListaCache = await api('moradores?select=id,nome&order=nome');
+    }
+    return moradoresListaCache;
+  }
+
   function mostrarFormularioLeitor(codigo, setorChave, produto, nomeSugerido){
     const s = SETORES[setorChave];
     const estado = document.getElementById('leitor-estado');
@@ -400,10 +408,16 @@
       <input id="f-nome" type="text" value="${esc(nome)}" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;margin-bottom:12px;font-size:14px">
       <label style="font-size:12.5px;color:var(--muted);display:block;margin-bottom:4px">Unidade (ex: un, cx, kg)</label>
       <input id="f-unidade" type="text" value="${esc(unidade)}" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;margin-bottom:12px;font-size:14px">
+      <label style="font-size:12.5px;color:var(--muted);display:block;margin-bottom:4px">Lote</label>
+      <input id="f-lote" type="text" placeholder="Opcional" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;margin-bottom:12px;font-size:14px">
       <label style="font-size:12.5px;color:var(--muted);display:block;margin-bottom:4px">Validade (se tiver — não vem no código, precisa digitar)</label>
       <input id="f-validade" type="date" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;margin-bottom:12px;font-size:14px">
       <label style="font-size:12.5px;color:var(--muted);display:block;margin-bottom:4px">Quantidade</label>
       <input id="f-qtd" type="number" min="1" value="1" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;margin-bottom:14px;font-size:14px">
+      <label style="font-size:12.5px;color:var(--muted);display:block;margin-bottom:4px">Morador${setorChave==='farmacia' ? ' (de quem é a medicação)' : ' (opcional)'}</label>
+      <select id="f-morador" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;margin-bottom:14px;font-size:14px">
+        <option value="">Carregando moradores...</option>
+      </select>
       <div style="display:flex;gap:10px;margin-bottom:14px">
         <button id="f-entrada" class="aba ativa" style="flex:1" type="button">📥 Entrada</button>
         <button id="f-saida" class="aba" style="flex:1" type="button">📤 Saída</button>
@@ -416,6 +430,15 @@
     document.getElementById('f-saida').addEventListener('click', ()=>setTipoMov('saida'));
     document.getElementById('f-salvar').addEventListener('click', ()=>{
       salvarMovimentoLeitor(codigo, setorChave, produto ? produto.id : null);
+    });
+    buscarMoradoresLista().then(lista=>{
+      const sel = document.getElementById('f-morador');
+      if(!sel) return;
+      sel.innerHTML = '<option value="">— Nenhum / não se aplica —</option>' +
+        lista.map(m=>`<option value="${esc(m.nome)}">${esc(m.nome)}</option>`).join('');
+    }).catch(()=>{
+      const sel = document.getElementById('f-morador');
+      if(sel) sel.innerHTML = '<option value="">Não consegui carregar moradores</option>';
     });
   }
 
@@ -430,8 +453,10 @@
     const msg = document.getElementById('f-msg');
     const nome = document.getElementById('f-nome').value.trim();
     const unidade = document.getElementById('f-unidade').value.trim() || 'un';
+    const lote = document.getElementById('f-lote').value.trim() || null;
     const validade = document.getElementById('f-validade').value || null;
     const qtd = Number(document.getElementById('f-qtd').value) || 0;
+    const residente = document.getElementById('f-morador').value || null;
     const tipo = window.__tipoMov || 'entrada';
     if(!nome || qtd <= 0){ msg.textContent = 'Preencha nome e uma quantidade válida.'; return; }
     leitorSalvando = true;
@@ -453,7 +478,7 @@
       }
       await apiWrite('movimentacoes', 'POST', {
         tipo, produto_nome: nome, codigo_barras: codigo, setor: setorChave,
-        quantidade: qtd, validade, data_hora: new Date().toISOString()
+        quantidade: qtd, validade, lote, residente, data_hora: new Date().toISOString()
       });
       document.getElementById('leitor-form').classList.add('oculto');
       const estado = document.getElementById('leitor-estado');
