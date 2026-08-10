@@ -453,7 +453,7 @@
     const ehCozinha = setorChave === 'cozinha';
     const ehFarmacia = setorChave === 'farmacia';
     const ehMedicamentos = setorChave === 'farmacia-medicamentos';
-    const mostrarUnidade = !ehLavanderia && !ehMedicamentos;
+    const mostrarUnidade = !ehLavanderia;
     const mostrarLote = !ehLavanderia && !ehCozinha && !ehMedicamentos;
     const mostrarValidade = !ehLavanderia && !ehMedicamentos;
     const mostrarMorador = ehLavanderia || (!ehCozinha && !ehFarmacia);
@@ -472,8 +472,10 @@
       })() : ''}
       <label style="font-size:12.5px;color:var(--muted);display:block;margin-bottom:4px">${ehLavanderia ? 'Peça de roupa' : ehMedicamentos ? 'Medicação' : 'Nome do produto'}</label>
       <input id="f-nome" type="text" value="${esc(nome)}" placeholder="${ehLavanderia ? 'Ex.: Lençol, Calça' : ehMedicamentos ? 'Ex.: AAS 100mg' : ''}" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;margin-bottom:12px;font-size:14px">
-      ${mostrarUnidade ? `<label style="font-size:12.5px;color:var(--muted);display:block;margin-bottom:4px">Unidade (ex: un, cx, kg)</label>
-      <input id="f-unidade" type="text" value="${esc(unidade)}" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;margin-bottom:12px;font-size:14px">` : ''}
+      ${ehMedicamentos ? `<label style="font-size:12.5px;color:var(--muted);display:block;margin-bottom:4px">Dose (ex: 100 mg)</label>
+      <input id="f-dose" type="text" placeholder="Opcional" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;margin-bottom:12px;font-size:14px">` : ''}
+      ${mostrarUnidade ? `<label style="font-size:12.5px;color:var(--muted);display:block;margin-bottom:4px">Unidade${ehMedicamentos ? ' (ex: cp, mL, gtt)' : ' (ex: un, cx, kg)'}</label>
+      <input id="f-unidade" type="text" value="${ehMedicamentos ? '' : esc(unidade)}" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;margin-bottom:12px;font-size:14px">` : ''}
       ${mostrarLote ? `<label style="font-size:12.5px;color:var(--muted);display:block;margin-bottom:4px">Lote</label>
       <input id="f-lote" type="text" placeholder="Opcional" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;margin-bottom:12px;font-size:14px">` : ''}
       ${mostrarValidade ? `<label style="font-size:12.5px;color:var(--muted);display:block;margin-bottom:4px">Validade (se tiver — não vem no código, precisa digitar)</label>
@@ -547,23 +549,20 @@
       const moradorEl = document.getElementById('f-morador');
       const morador = moradorEl ? moradorEl.value : '';
       if(!morador){ msg.textContent = 'Escolha o morador (residente).'; return; }
+      const doseEl = document.getElementById('f-dose');
+      const unidadeEl = document.getElementById('f-unidade');
       const f = funcionarioAtual();
       msg.textContent = 'Abrindo o painel de Medicamentos...';
-      // Não sabemos o nome exato dos campos desse painel (não deu pra ver o código-fonte
-      // real), então manda várias variações prováveis ao mesmo tempo — um parâmetro extra
-      // que não bate com nada é só ignorado, não quebra nada.
+      // Confirmado direto no código-fonte real (inspecionado pelo usuário): action="entrada"
+      // (não "mov") e a quantidade é "quantity_in" (não "quantity").
       const usp = new URLSearchParams({
-        action: 'mov',
-        movement: 'entrada',
+        action: 'entrada',
         resident: morador,
-        resident_name: morador,
-        residente: morador,
         medication: nome,
-        med_name: nome,
-        medicamento: nome,
-        quantity: String(qtd),
-        updated_by: f ? f.nome : '',
-        seu_nome: f ? f.nome : ''
+        dose: doseEl ? doseEl.value.trim() : '',
+        unit: unidadeEl ? unidadeEl.value.trim() : '',
+        quantity_in: String(qtd),
+        updated_by: f ? f.nome : ''
       });
       location.href = FARMACIA_MEDICAMENTOS_URL + '?' + usp.toString();
       return;
