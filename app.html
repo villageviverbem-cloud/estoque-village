@@ -549,13 +549,21 @@
       if(!morador){ msg.textContent = 'Escolha o morador (residente).'; return; }
       const f = funcionarioAtual();
       msg.textContent = 'Abrindo o painel de Medicamentos...';
+      // Não sabemos o nome exato dos campos desse painel (não deu pra ver o código-fonte
+      // real), então manda várias variações prováveis ao mesmo tempo — um parâmetro extra
+      // que não bate com nada é só ignorado, não quebra nada.
       const usp = new URLSearchParams({
         action: 'mov',
         movement: 'entrada',
         resident: morador,
+        resident_name: morador,
+        residente: morador,
         medication: nome,
+        med_name: nome,
+        medicamento: nome,
         quantity: String(qtd),
-        updated_by: f ? f.nome : ''
+        updated_by: f ? f.nome : '',
+        seu_nome: f ? f.nome : ''
       });
       location.href = FARMACIA_MEDICAMENTOS_URL + '?' + usp.toString();
       return;
