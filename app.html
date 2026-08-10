@@ -295,7 +295,7 @@
         </a>` : '';
     app.innerHTML = `
       <div class="topo" style="background:linear-gradient(120deg,${s.grad[0]},${s.grad[1]})">
-        <button class="voltar" onclick="location.hash='inicio'">← Voltar ao início</button>
+        <button class="voltar" onclick="voltarParaIlpi()">← Voltar</button>
         <h1>${s.icone} ${s.nome}</h1>
         <p>${s.sub}</p>
       </div>
@@ -545,7 +545,7 @@
   function telaEstoque(){
     app.innerHTML = `
       <div class="topo" style="background:linear-gradient(120deg,var(--grad1),var(--grad2))">
-        <button class="voltar" onclick="location.hash='inicio'">← Voltar ao início</button>
+        <button class="voltar" onclick="voltarParaIlpi()">← Voltar</button>
         <h1>📊 Estoque Village</h1>
         <p>Residencial Care · controle de insumos</p>
         <button class="atualizado" onclick="carregarEstoque()">🔄 <span id="quando">Carregando...</span></button>
