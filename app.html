@@ -892,11 +892,11 @@
       moradorNomeCache[m.id] = m.nome;
       document.getElementById('mf-nome').textContent = m.nome || '—';
       const acoes = [
-        {chave:'agua', hashBase:'registrar-agua', editavel:true, ico:'💧', bg:'#eaf1fb', cor:'#4a6fa5', nome:'Bebeu água / Hidratação', desc:'Registrar copos de água'},
-        {chave:'fralda', hashBase:'registrar-fralda', editavel:true, ico:'🧷', bg:'#fdecec', cor:'#c85a5a', nome:'Checar / Trocar fralda', desc:'Registrar situação e troca'},
-        {chave:'alimentacao', hashBase:'registrar-alimentacao', editavel:true, ico:'🍽️', bg:'#fef2e8', cor:'#c77b3b', nome:'Alimentação', desc:'Registrar refeição e aceitação'},
-        {chave:'higiene', hashBase:'registrar-higiene', editavel:true, ico:'🛁', bg:'#e8f4f4', cor:'#2f6f6e', nome:'Higiene / Banho', desc:'Registrar tipo de banho/higiene'},
-        {chave:'decubito', hashBase:'registrar-decubito', editavel:true, ico:'🔄', bg:'#eaf1fb', cor:'#4a6fa5', nome:'Mudança de decúbito', desc:'Registrar posição'},
+        {chave:'agua', hashBase:'registrar-agua', editavel:false, ico:'💧', bg:'#eaf1fb', cor:'#4a6fa5', nome:'Bebeu água / Hidratação', desc:'Registrar copos de água'},
+        {chave:'fralda', hashBase:'registrar-fralda', editavel:false, ico:'🧷', bg:'#fdecec', cor:'#c85a5a', nome:'Checar / Trocar fralda', desc:'Registrar situação e troca'},
+        {chave:'alimentacao', hashBase:'registrar-alimentacao', editavel:false, ico:'🍽️', bg:'#fef2e8', cor:'#c77b3b', nome:'Alimentação', desc:'Registrar refeição e aceitação'},
+        {chave:'higiene', hashBase:'registrar-higiene', editavel:false, ico:'🛁', bg:'#e8f4f4', cor:'#2f6f6e', nome:'Higiene / Banho', desc:'Registrar tipo de banho/higiene'},
+        {chave:'decubito', hashBase:'registrar-decubito', editavel:false, ico:'🔄', bg:'#eaf1fb', cor:'#4a6fa5', nome:'Mudança de decúbito', desc:'Registrar posição'},
         {chave:'anotacao', hashBase:'anotacao', editavel:false, ico:'📝', bg:'#f0f0f0', cor:'#607080', nome:'Anotação livre', desc:'Escrever uma observação'},
         {chave:'vitais', hashBase:'vitais', editavel:false, ico:'❤️', bg:'#fdecec', cor:'#c85a5a', nome:'Sinais Vitais', desc:'Registrar pressão, temperatura etc.'},
         {chave:'evolucao', hashBase:'evolucao', editavel:false, ico:'📔', bg:'#fef2e8', cor:'#c77b3b', nome:'Evolução Diária', desc:'Registrar evolução do turno'},
@@ -973,148 +973,120 @@
   }
 
   // ---------- REGISTROS RÁPIDOS: ÁGUA E FRALDA ----------
+  // A partir daqui, os registros de cuidado NÃO gravam mais numa tabela nossa —
+  // eles enviam direto pro Prontuário do Residente que já existe (mesmo link,
+  // mesmos campos que o formulário antigo já usava), então caem no mesmo lugar
+  // de sempre e os contadores/checklist do Prontuário continuam funcionando.
+  const ILPI_HISTORICO_URL = 'https://eduardonoronha9.app.n8n.cloud/webhook/ilpi-historico';
+
+  function construirUrlCuidado(params){
+    // Manda todo campo, mesmo vazio (só pula null/undefined) — igual um <input> de
+    // formulário normal sempre envia seu valor, mesmo que esteja em branco.
+    const usp = new URLSearchParams();
+    Object.keys(params).forEach(k => {
+      if(params[k] !== null && params[k] !== undefined) usp.set(k, params[k]);
+    });
+    return ILPI_HISTORICO_URL + '?' + usp.toString();
+  }
+
   const CUIDADO_CONFIG = {
     agua: {
       titulo: '💧 Bebeu água / Hidratação', cor: '#4a6fa5',
-      pergunta: 'Quantos copos? (1 copo = 200 ml)',
-      opcoes: ['1 copo (200 ml)','2 copos (400 ml)','3 copos (600 ml)','4 copos (800 ml)','5+ copos (1000+ ml)']
+      pergunta: 'Quantos copos? (1 copo = 200 ml)', careType: 'Hidratação', comoCopos: true,
+      opcoes: [
+        {label:'1 copo (200 ml)', valor:'1'}, {label:'2 copos (400 ml)', valor:'2'},
+        {label:'3 copos (600 ml)', valor:'3'}, {label:'4 copos (800 ml)', valor:'4'},
+        {label:'5+ copos (1000+ ml)', valor:'5'}
+      ]
     },
     fralda: {
       titulo: '🧷 Checar / Trocar fralda', cor: '#c85a5a',
-      pergunta: 'Situação',
-      opcoes: ['Seca - sem troca','Molhada - trocada','Suja - trocada e higienizada']
+      pergunta: 'Situação', careType: 'Fralda',
+      opcoes: ['Seca - sem troca','Trocada - urina','Trocada - fezes','Trocada - urina e fezes'].map(v=>({label:v, valor:v}))
     },
     higiene: {
       titulo: '🛁 Higiene / Banho', cor: '#2f6f6e',
-      pergunta: 'Tipo',
-      opcoes: ['Banho completo','Banho no leito','Higiene íntima','Troca de roupa']
+      pergunta: 'Tipo', careType: 'Higiene',
+      opcoes: ['Banho completo','Higiene íntima','Higiene oral','Troca de roupa de cama'].map(v=>({label:v, valor:v}))
     },
     decubito: {
       titulo: '🔄 Mudança de decúbito', cor: '#4a6fa5',
-      pergunta: 'Posição',
-      opcoes: ['Decúbito dorsal','Decúbito lateral direito','Decúbito lateral esquerdo','Sentado / Cadeira de rodas']
+      pergunta: 'Posição', careType: 'Mudança de decúbito',
+      opcoes: ['Decúbito dorsal','Decúbito lateral direito','Decúbito lateral esquerdo','Sentado / poltrona'].map(v=>({label:v, valor:v}))
     }
   };
   let cuidadoSelecionado = null;
-  let cuidadoEditandoId = null; // null = criando novo registro; senão, id do registro sendo editado
 
-  function telaRegistrarSimples(tipo, moradorId, editar){
-    const hashAtual = (editar ? 'editar-' : 'registrar-') + tipo + '-' + moradorId;
+  function telaRegistrarSimples(tipo, moradorId){
+    const hashAtual = 'registrar-' + tipo + '-' + moradorId;
     if(!exigirFuncionario(hashAtual)) return;
     cuidadoSelecionado = null;
-    cuidadoEditandoId = null;
     const cfg = CUIDADO_CONFIG[tipo];
     app.innerHTML = `
       <div class="topo" style="background:linear-gradient(120deg,${cfg.cor},${cfg.cor})">
         <button class="voltar" id="btn-voltar-morador">← Voltar</button>
         <h1>${cfg.titulo}</h1>
-        ${editar ? '<p>Editando o último registro</p>' : ''}
       </div>
       ${bannerFuncionario(hashAtual)}
       <div class="wrap">
         <div style="font-size:14px;font-weight:600;color:var(--teal-esc);margin-bottom:10px">${cfg.pergunta}</div>
         <div class="chip-opcoes" id="cd-chips">
-          ${cfg.opcoes.map(o=>`<div class="chip" data-valor="${esc(o)}">${esc(o)}</div>`).join('')}
+          ${cfg.opcoes.map(o=>`<div class="chip" data-valor="${esc(o.valor)}">${esc(o.label)}</div>`).join('')}
         </div>
         <label style="font-size:12.5px;color:var(--muted);display:block;margin:14px 0 4px">Observação (opcional)</label>
         <textarea id="cd-obs" rows="2" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px"></textarea>
-        <button id="cd-salvar" style="width:100%;background:${cfg.cor};color:#fff;border:none;border-radius:14px;padding:14px;font-size:15px;font-weight:700;margin-top:14px">${editar ? 'Salvar alteração' : 'Registrar'}</button>
+        <button id="cd-salvar" style="width:100%;background:${cfg.cor};color:#fff;border:none;border-radius:14px;padding:14px;font-size:15px;font-weight:700;margin-top:14px">Registrar</button>
         <div id="cd-msg" style="text-align:center;font-size:12.5px;color:var(--muted);margin-top:10px"></div>
       </div>
     `;
     document.getElementById('btn-voltar-morador').addEventListener('click', () => { location.hash = 'morador-' + moradorId; });
     ligarChips('cd-chips', v => cuidadoSelecionado = v);
     document.getElementById('cd-salvar').addEventListener('click', () => salvarCuidado(tipo, moradorId));
-    if(editar){
-      const btnSalvar = document.getElementById('cd-salvar');
-      if(btnSalvar) btnSalvar.disabled = true;
-      carregarUltimoCuidado(tipo, moradorId);
-    }
-  }
-
-  async function carregarUltimoCuidado(tipo, moradorId){
-    const token = viewToken;
-    const msg = document.getElementById('cd-msg');
-    try{
-      const rows = await api('registros_cuidado?select=*&tipo=eq.'+encodeURIComponent(tipo)+'&morador_id=eq.'+encodeURIComponent(moradorId)+'&order=data_hora.desc&limit=1');
-      if(token !== viewToken) return;
-      if(!rows.length){
-        if(msg) msg.textContent = 'Nenhum registro anterior desse tipo ainda — isso vai criar um novo.';
-        return;
-      }
-      const r = rows[0];
-      cuidadoEditandoId = r.id;
-      const cont = document.getElementById('cd-chips');
-      if(cont){
-        cont.querySelectorAll('.chip').forEach(c=>{
-          const sel = c.dataset.valor === r.valor;
-          c.classList.toggle('sel', sel);
-        });
-      }
-      cuidadoSelecionado = r.valor;
-      const obsEl = document.getElementById('cd-obs');
-      if(obsEl) obsEl.value = r.observacao || '';
-    }catch(e){
-      if(token !== viewToken) return;
-      if(msg) msg.textContent = '⚠️ Não consegui carregar o registro anterior: ' + esc(e.message);
-    }finally{
-      if(token === viewToken){
-        const btnSalvar = document.getElementById('cd-salvar');
-        if(btnSalvar) btnSalvar.disabled = false;
-      }
-    }
   }
 
   async function salvarCuidado(tipo, moradorId){
     const msg = document.getElementById('cd-msg');
     if(!cuidadoSelecionado){ msg.textContent = 'Escolha uma opção.'; return; }
     const f = funcionarioAtual();
-    if(!f){ location.hash = 'funcionarios?v=' + encodeURIComponent((cuidadoEditandoId?'editar-':'registrar-')+tipo+'-'+moradorId); return; }
+    if(!f){ location.hash = 'funcionarios?v=' + encodeURIComponent('registrar-'+tipo+'-'+moradorId); return; }
     const obs = document.getElementById('cd-obs').value.trim();
-    msg.textContent = 'Salvando...';
+    const cfg = CUIDADO_CONFIG[tipo];
+    msg.textContent = 'Enviando pro prontuário...';
     const btn = document.getElementById('cd-salvar');
     if(btn) btn.disabled = true;
     try{
-      if(cuidadoEditandoId){
-        // Corrige só o conteúdo — mantém quem registrou e quando de verdade aconteceu,
-        // pra não perder a responsabilização do registro original.
-        await apiWrite('registros_cuidado?id=eq.'+encodeURIComponent(cuidadoEditandoId), 'PATCH', {
-          valor: cuidadoSelecionado, observacao: obs || null
-        });
-      }else{
-        const moradorNome = await nomeDoMorador(moradorId);
-        await apiWrite('registros_cuidado', 'POST', {
-          morador_id: moradorId, morador_nome: moradorNome, tipo, valor: cuidadoSelecionado,
-          observacao: obs || null, funcionario_id: f.id, funcionario_nome: f.nome,
-          data_hora: new Date().toISOString()
-        });
-      }
-      location.hash = 'morador-' + moradorId;
+      const moradorNome = await nomeDoMorador(moradorId);
+      const params = {
+        action: 'care', resident: moradorNome, back_tab: 'acoes',
+        care_type: cfg.careType, recorded_by: f.nome, notes: obs
+      };
+      if(cfg.comoCopos) params.copos = cuidadoSelecionado; else params.detail = cuidadoSelecionado;
+      location.href = construirUrlCuidado(params);
     }catch(e){
-      msg.textContent = '⚠️ Erro: ' + esc(e.message) + '. Se a tabela "registros_cuidado" não existe, rode o SQL que te mandei.';
-    }finally{
+      msg.textContent = '⚠️ Erro: ' + esc(e.message) + '.';
       if(btn) btn.disabled = false;
     }
   }
 
   // ---------- REGISTRO RÁPIDO: ALIMENTAÇÃO (dois grupos de opção) ----------
   const ALIMENTACAO_REFEICOES = ['Café da manhã','Almoço','Lanche','Jantar','Ceia'];
-  const ALIMENTACAO_ACEITACAO = ['Aceitou tudo','Aceitou parcialmente','Recusou'];
+  const ALIMENTACAO_ACEITACAO = [
+    {label:'Aceitou tudo', valor:'aceitou tudo'},
+    {label:'Parcial', valor:'parcial'},
+    {label:'Recusou', valor:'recusou'}
+  ];
   let alimentacaoRefeicao = null;
   let alimentacaoAceitacao = null;
-  let alimentacaoEditandoId = null;
 
-  function telaRegistrarAlimentacao(moradorId, editar){
-    const hashAtual = (editar ? 'editar-' : 'registrar-') + 'alimentacao-' + moradorId;
+  function telaRegistrarAlimentacao(moradorId){
+    const hashAtual = 'registrar-alimentacao-' + moradorId;
     if(!exigirFuncionario(hashAtual)) return;
     alimentacaoRefeicao = null;
     alimentacaoAceitacao = null;
-    alimentacaoEditandoId = null;
     app.innerHTML = `
       <div class="topo" style="background:linear-gradient(120deg,#e8933f,#c77b3b)">
         <button class="voltar" id="btn-voltar-morador">← Voltar</button>
         <h1>🍽️ Alimentação</h1>
-        ${editar ? '<p>Editando o último registro</p>' : ''}
       </div>
       ${bannerFuncionario(hashAtual)}
       <div class="wrap">
@@ -1124,11 +1096,11 @@
         </div>
         <div style="font-size:14px;font-weight:600;color:var(--teal-esc);margin:16px 0 10px">Aceitação</div>
         <div class="chip-opcoes" id="al-aceitacao">
-          ${ALIMENTACAO_ACEITACAO.map(o=>`<div class="chip" data-valor="${esc(o)}">${esc(o)}</div>`).join('')}
+          ${ALIMENTACAO_ACEITACAO.map(o=>`<div class="chip" data-valor="${esc(o.valor)}">${esc(o.label)}</div>`).join('')}
         </div>
         <label style="font-size:12.5px;color:var(--muted);display:block;margin:14px 0 4px">Observação (opcional)</label>
         <textarea id="cd-obs" rows="2" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px"></textarea>
-        <button id="cd-salvar" style="width:100%;background:#c77b3b;color:#fff;border:none;border-radius:14px;padding:14px;font-size:15px;font-weight:700;margin-top:14px">${editar ? 'Salvar alteração' : 'Registrar'}</button>
+        <button id="cd-salvar" style="width:100%;background:#c77b3b;color:#fff;border:none;border-radius:14px;padding:14px;font-size:15px;font-weight:700;margin-top:14px">Registrar</button>
         <div id="cd-msg" style="text-align:center;font-size:12.5px;color:var(--muted);margin-top:10px"></div>
       </div>
     `;
@@ -1136,80 +1108,26 @@
     ligarChips('al-refeicao', v => alimentacaoRefeicao = v);
     ligarChips('al-aceitacao', v => alimentacaoAceitacao = v);
     document.getElementById('cd-salvar').addEventListener('click', () => salvarAlimentacao(moradorId));
-    if(editar){
-      const btnSalvar = document.getElementById('cd-salvar');
-      if(btnSalvar) btnSalvar.disabled = true;
-      carregarUltimaAlimentacao(moradorId);
-    }
-  }
-
-  async function carregarUltimaAlimentacao(moradorId){
-    const token = viewToken;
-    const msg = document.getElementById('cd-msg');
-    try{
-      const rows = await api('registros_cuidado?select=*&tipo=eq.alimentacao&morador_id=eq.'+encodeURIComponent(moradorId)+'&order=data_hora.desc&limit=1');
-      if(token !== viewToken) return;
-      if(!rows.length){
-        if(msg) msg.textContent = 'Nenhum registro anterior ainda — isso vai criar um novo.';
-        return;
-      }
-      const r = rows[0];
-      alimentacaoEditandoId = r.id;
-      const partes = (r.valor || '').split(' - ');
-      const refeicaoSalva = partes[0] || '';
-      const aceitacaoSalva = partes[1] || '';
-      const refCont = document.getElementById('al-refeicao');
-      refCont.querySelectorAll('.chip').forEach(c=>{
-        const sel = c.dataset.valor === refeicaoSalva;
-        c.classList.toggle('sel', sel);
-        if(sel) alimentacaoRefeicao = c.dataset.valor;
-      });
-      const aceCont = document.getElementById('al-aceitacao');
-      aceCont.querySelectorAll('.chip').forEach(c=>{
-        const sel = c.dataset.valor.toLowerCase() === aceitacaoSalva.toLowerCase();
-        c.classList.toggle('sel', sel);
-        if(sel) alimentacaoAceitacao = c.dataset.valor;
-      });
-      const obsEl = document.getElementById('cd-obs');
-      if(obsEl) obsEl.value = r.observacao || '';
-    }catch(e){
-      if(token !== viewToken) return;
-      if(msg) msg.textContent = '⚠️ Não consegui carregar o registro anterior: ' + esc(e.message);
-    }finally{
-      if(token === viewToken){
-        const btnSalvar = document.getElementById('cd-salvar');
-        if(btnSalvar) btnSalvar.disabled = false;
-      }
-    }
   }
 
   async function salvarAlimentacao(moradorId){
     const msg = document.getElementById('cd-msg');
     if(!alimentacaoRefeicao || !alimentacaoAceitacao){ msg.textContent = 'Escolha a refeição e a aceitação.'; return; }
     const f = funcionarioAtual();
-    if(!f){ location.hash = 'funcionarios?v=' + encodeURIComponent((alimentacaoEditandoId?'editar-':'registrar-')+'alimentacao-'+moradorId); return; }
+    if(!f){ location.hash = 'funcionarios?v=' + encodeURIComponent('registrar-alimentacao-'+moradorId); return; }
     const obs = document.getElementById('cd-obs').value.trim();
-    msg.textContent = 'Salvando...';
+    msg.textContent = 'Enviando pro prontuário...';
     const btn = document.getElementById('cd-salvar');
     if(btn) btn.disabled = true;
     try{
-      const valor = alimentacaoRefeicao + ' - ' + alimentacaoAceitacao.charAt(0).toLowerCase() + alimentacaoAceitacao.slice(1);
-      if(alimentacaoEditandoId){
-        await apiWrite('registros_cuidado?id=eq.'+encodeURIComponent(alimentacaoEditandoId), 'PATCH', {
-          valor, observacao: obs || null
-        });
-      }else{
-        const moradorNome = await nomeDoMorador(moradorId);
-        await apiWrite('registros_cuidado', 'POST', {
-          morador_id: moradorId, morador_nome: moradorNome, tipo: 'alimentacao', valor,
-          observacao: obs || null, funcionario_id: f.id, funcionario_nome: f.nome,
-          data_hora: new Date().toISOString()
-        });
-      }
-      location.hash = 'morador-' + moradorId;
+      const moradorNome = await nomeDoMorador(moradorId);
+      const detail = alimentacaoRefeicao + ' - ' + alimentacaoAceitacao;
+      location.href = construirUrlCuidado({
+        action: 'care', resident: moradorNome, back_tab: 'acoes',
+        care_type: 'Alimentação', detail, recorded_by: f.nome, notes: obs
+      });
     }catch(e){
       msg.textContent = '⚠️ Erro: ' + esc(e.message) + '.';
-    }finally{
       if(btn) btn.disabled = false;
     }
   }
@@ -1241,20 +1159,17 @@
     if(!texto){ msg.textContent = 'Escreva alguma coisa antes de salvar.'; return; }
     const f = funcionarioAtual();
     if(!f){ location.hash = 'funcionarios?v=' + encodeURIComponent('anotacao-'+moradorId); return; }
-    msg.textContent = 'Salvando...';
+    msg.textContent = 'Enviando pro prontuário...';
     const btn = document.getElementById('an-salvar');
     if(btn) btn.disabled = true;
     try{
       const moradorNome = await nomeDoMorador(moradorId);
-      await apiWrite('registros_cuidado', 'POST', {
-        morador_id: moradorId, morador_nome: moradorNome, tipo: 'anotacao', valor: texto,
-        observacao: null, funcionario_id: f.id, funcionario_nome: f.nome,
-        data_hora: new Date().toISOString()
+      location.href = construirUrlCuidado({
+        action: 'care', resident: moradorNome, back_tab: 'acoes',
+        care_type: 'Observação', notes: texto, recorded_by: f.nome
       });
-      location.hash = 'morador-' + moradorId;
     }catch(e){
       msg.textContent = '⚠️ Erro: ' + esc(e.message) + '.';
-    }finally{
       if(btn) btn.disabled = false;
     }
   }
@@ -1607,11 +1522,6 @@
     else if((m = apósPrefixo(hash, 'leitor-')) !== null) telaLeitor(m);
     else if(hash === 'funcionarios') telaFuncionarios();
     else if(hash === 'funcionarios-novo') telaFuncionarioNovo();
-    else if((m = apósPrefixo(hash, 'editar-agua-')) !== null) telaRegistrarSimples('agua', m, true);
-    else if((m = apósPrefixo(hash, 'editar-fralda-')) !== null) telaRegistrarSimples('fralda', m, true);
-    else if((m = apósPrefixo(hash, 'editar-higiene-')) !== null) telaRegistrarSimples('higiene', m, true);
-    else if((m = apósPrefixo(hash, 'editar-decubito-')) !== null) telaRegistrarSimples('decubito', m, true);
-    else if((m = apósPrefixo(hash, 'editar-alimentacao-')) !== null) telaRegistrarAlimentacao(m, true);
     else if((m = apósPrefixo(hash, 'editar-katz-')) !== null) telaKatz(m, true);
     else if((m = apósPrefixo(hash, 'registrar-agua-')) !== null) telaRegistrarSimples('agua', m);
     else if((m = apósPrefixo(hash, 'registrar-fralda-')) !== null) telaRegistrarSimples('fralda', m);
