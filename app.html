@@ -176,6 +176,17 @@
     if(!r.ok) throw new Error('Erro ' + r.status);
     return r.json();
   }
+  async function apiWrite(caminho, method, body){
+    const r = await fetch(SUPABASE_URL + '/rest/v1/' + caminho, {
+      method,
+      headers: {
+        apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY,
+        'Content-Type': 'application/json', 'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify(body)
+    });
+    if(!r.ok) throw new Error('Erro ' + r.status + ' ao gravar');
+  }
 
   const app = document.getElementById('app');
 
@@ -245,9 +256,14 @@
       </div>
       <div class="instrucao">O que você quer fazer?<span>Escolha uma das opções abaixo</span></div>
       <div class="opcoes">
+        <a class="opcao" href="#leitor-${chave}" style="border:2px solid ${s.cor}">
+          <div class="ico" style="background:${s.corBg};color:${s.cor}">📷</div>
+          <div class="txt"><div class="nome">Leitor rápido (novo)</div><div class="desc">Escaneie e o produto já vem preenchido, se já foi cadastrado antes</div></div>
+          <div class="seta" style="color:${s.cor}">→</div>
+        </a>
         <a class="opcao" href="${FORM_MOVIMENTACAO}" target="_blank">
           <div class="ico" style="background:${s.corBg};color:${s.cor}">📦</div>
-          <div class="txt"><div class="nome">Registrar entrada / saída</div><div class="desc">Leia o código e movimente o estoque</div></div>
+          <div class="txt"><div class="nome">Registrar entrada / saída (formulário)</div><div class="desc">Leia o código e movimente o estoque</div></div>
           <div class="seta" style="color:${s.cor}">→</div>
         </a>
         <a class="opcao" href="${FORM_CADASTRO_PRODUTO}" target="_blank">
@@ -265,6 +281,163 @@
       <div class="dica">${s.dica}</div>
       <div class="rodape">Village Viver Bem · Residencial Care · ${s.nome} v2</div>
     `;
+  }
+
+  // ---------- LEITOR RÁPIDO (lê o código, busca no nosso banco e, se não achar, tenta o nome numa base pública) ----------
+  let leitorSalvando = false;
+
+  function telaLeitor(chave){
+    const s = SETORES[chave];
+    if(!s){ location.hash = 'inicio'; return; }
+    leitorSalvando = false;
+    app.innerHTML = `
+      <div class="topo" style="background:linear-gradient(120deg,${s.grad[0]},${s.grad[1]})">
+        <button class="voltar" onclick="location.hash='${chave}'">← Voltar</button>
+        <h1>📷 Leitor — ${s.nome}</h1>
+        <p>Aponte o leitor pro código de barras</p>
+      </div>
+      <div style="padding:20px 16px 4px">
+        <input id="scan-input" type="text" autocomplete="off" placeholder="Aguardando leitura..." style="width:100%;border:2px solid ${s.cor};border-radius:14px;padding:16px;font-size:16px;text-align:center;background:#fff">
+      </div>
+      <div id="leitor-estado" class="estado">Escaneie um produto pra começar.</div>
+      <div id="leitor-form" class="wrap oculto"></div>
+      <div class="rodape">Village Viver Bem · Residencial Care · Leitor v1</div>
+    `;
+    const input = document.getElementById('scan-input');
+    input.focus();
+    input.addEventListener('keydown', e=>{
+      if(e.key === 'Enter'){
+        e.preventDefault();
+        const codigo = input.value.trim();
+        input.value = '';
+        if(codigo) handleScan(codigo, chave);
+      }
+    });
+  }
+
+  // Mantém o campo de leitura em foco (o leitor USB "digita" nele) mesmo se o usuário tocar na tela.
+  // Registrado uma única vez, fora de telaLeitor, pra não empilhar um listener novo a cada visita.
+  document.addEventListener('click', ()=>{
+    const i = document.getElementById('scan-input');
+    if(i) i.focus();
+  });
+
+  async function handleScan(codigo, setorChave){
+    const token = viewToken;
+    const estado = document.getElementById('leitor-estado');
+    const formEl = document.getElementById('leitor-form');
+    formEl.classList.add('oculto');
+    estado.classList.remove('oculto');
+    estado.innerHTML = '<div class="spin"></div>Procurando "'+esc(codigo)+'"...';
+    try{
+      const existentes = await api('produtos?select=*&codigo_barras=eq.'+encodeURIComponent(codigo)+'&setor=eq.'+encodeURIComponent(setorChave));
+      if(token !== viewToken) return;
+      const produto = existentes[0] || null;
+      let nomeSugerido = '';
+      if(!produto){
+        try{
+          const r = await fetch('https://world.openfoodfacts.org/api/v2/product/'+encodeURIComponent(codigo)+'.json');
+          const d = await r.json();
+          if(token !== viewToken) return;
+          if(d && d.status === 1 && d.product){
+            nomeSugerido = (d.product.product_name || d.product.product_name_pt || '').toString().trim();
+          }
+        }catch(_e){ /* busca externa é best-effort — segue sem nome sugerido se falhar */ }
+      }
+      if(token !== viewToken) return;
+      mostrarFormularioLeitor(codigo, setorChave, produto, nomeSugerido);
+    }catch(e){
+      if(token !== viewToken) return;
+      estado.innerHTML = '⚠️ Não consegui consultar o estoque.<br><small>('+esc(e.message)+')</small>';
+    }
+  }
+
+  function mostrarFormularioLeitor(codigo, setorChave, produto, nomeSugerido){
+    const s = SETORES[setorChave];
+    const estado = document.getElementById('leitor-estado');
+    const formEl = document.getElementById('leitor-form');
+    estado.classList.add('oculto');
+    formEl.classList.remove('oculto');
+    const nome = produto ? produto.nome : nomeSugerido;
+    const unidade = produto ? (produto.unidade || 'un') : 'un';
+    formEl.innerHTML = `
+      <div class="item" style="margin-bottom:14px">
+        <div>
+          <div class="nome">${produto ? '✅ Produto já cadastrado' : (nomeSugerido ? '🔎 Nome sugerido, confira' : '🆕 Produto novo, preencha')}</div>
+          <div class="sub">Código: ${esc(codigo)}${produto ? ' · Estoque atual: ' + (Number(produto.estoque_atual)||0) : ''}</div>
+        </div>
+      </div>
+      <label style="font-size:12.5px;color:var(--muted);display:block;margin-bottom:4px">Nome do produto</label>
+      <input id="f-nome" type="text" value="${esc(nome)}" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;margin-bottom:12px;font-size:14px">
+      <label style="font-size:12.5px;color:var(--muted);display:block;margin-bottom:4px">Unidade (ex: un, cx, kg)</label>
+      <input id="f-unidade" type="text" value="${esc(unidade)}" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;margin-bottom:12px;font-size:14px">
+      <label style="font-size:12.5px;color:var(--muted);display:block;margin-bottom:4px">Validade (se tiver — não vem no código, precisa digitar)</label>
+      <input id="f-validade" type="date" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;margin-bottom:12px;font-size:14px">
+      <label style="font-size:12.5px;color:var(--muted);display:block;margin-bottom:4px">Quantidade</label>
+      <input id="f-qtd" type="number" min="1" value="1" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;margin-bottom:14px;font-size:14px">
+      <div style="display:flex;gap:10px;margin-bottom:14px">
+        <button id="f-entrada" class="aba ativa" style="flex:1" type="button">📥 Entrada</button>
+        <button id="f-saida" class="aba" style="flex:1" type="button">📤 Saída</button>
+      </div>
+      <button id="f-salvar" style="width:100%;background:${s.cor};color:#fff;border:none;border-radius:14px;padding:14px;font-size:15px;font-weight:700">Salvar</button>
+      <div id="f-msg" style="text-align:center;font-size:12.5px;color:var(--muted);margin-top:10px"></div>
+    `;
+    window.__tipoMov = 'entrada';
+    document.getElementById('f-entrada').addEventListener('click', ()=>setTipoMov('entrada'));
+    document.getElementById('f-saida').addEventListener('click', ()=>setTipoMov('saida'));
+    document.getElementById('f-salvar').addEventListener('click', ()=>{
+      salvarMovimentoLeitor(codigo, setorChave, produto ? produto.id : null);
+    });
+  }
+
+  function setTipoMov(tipo){
+    window.__tipoMov = tipo;
+    document.getElementById('f-entrada').classList.toggle('ativa', tipo==='entrada');
+    document.getElementById('f-saida').classList.toggle('ativa', tipo==='saida');
+  }
+
+  async function salvarMovimentoLeitor(codigo, setorChave, produtoId){
+    if(leitorSalvando) return;
+    const msg = document.getElementById('f-msg');
+    const nome = document.getElementById('f-nome').value.trim();
+    const unidade = document.getElementById('f-unidade').value.trim() || 'un';
+    const validade = document.getElementById('f-validade').value || null;
+    const qtd = Number(document.getElementById('f-qtd').value) || 0;
+    const tipo = window.__tipoMov || 'entrada';
+    if(!nome || qtd <= 0){ msg.textContent = 'Preencha nome e uma quantidade válida.'; return; }
+    leitorSalvando = true;
+    const btn = document.getElementById('f-salvar');
+    if(btn) btn.disabled = true;
+    msg.textContent = 'Salvando...';
+    try{
+      const delta = tipo === 'entrada' ? qtd : -qtd;
+      if(produtoId !== null && produtoId !== undefined){
+        const atuais = await api('produtos?select=*&id=eq.'+encodeURIComponent(produtoId));
+        const produto = atuais[0];
+        const novoEstoque = (Number(produto.estoque_atual)||0) + delta;
+        await apiWrite('produtos?id=eq.'+encodeURIComponent(produtoId), 'PATCH', {estoque_atual: novoEstoque, nome, unidade});
+      }else{
+        await apiWrite('produtos', 'POST', {
+          nome, unidade, setor: setorChave, codigo_barras: codigo,
+          estoque_atual: delta, estoque_minimo: 0
+        });
+      }
+      await apiWrite('movimentacoes', 'POST', {
+        tipo, produto_nome: nome, codigo_barras: codigo, setor: setorChave,
+        quantidade: qtd, validade, data_hora: new Date().toISOString()
+      });
+      document.getElementById('leitor-form').classList.add('oculto');
+      const estado = document.getElementById('leitor-estado');
+      estado.classList.remove('oculto');
+      estado.innerHTML = '✅ Movimentação registrada. Escaneie o próximo produto.';
+      const input = document.getElementById('scan-input');
+      if(input){ input.value=''; input.focus(); }
+    }catch(e){
+      msg.textContent = '⚠️ Erro ao salvar: ' + esc(e.message) + '. Me avisa que eu ajusto.';
+    }finally{
+      leitorSalvando = false;
+      if(btn) btn.disabled = false;
+    }
   }
 
   // ---------- ESTOQUE ----------
@@ -420,7 +593,7 @@
           html += `<div class="morador">
             <div class="av">${esc(iniciais(nome))}</div>
             <div style="flex:1"><div class="nome">${esc(nome)}</div><div class="quarto">🚪 ${quarto}</div></div>
-            <a class="btn-scan" href="${FORM_MOVIMENTACAO}" target="_blank">📷 Ler código</a>
+            <a class="btn-scan" href="#leitor-farmacia">📷 Ler código</a>
           </div>`;
         });
         el.innerHTML = html;
@@ -442,6 +615,7 @@
     if(hash === 'inicio') telaInicio();
     else if(hash === 'estoque') telaEstoque();
     else if(hash === 'moradores') telaMoradores();
+    else if(hash.indexOf('leitor-') === 0) telaLeitor(hash.slice(7));
     else if(SETORES[hash]) telaSetor(hash);
     else telaInicio();
     window.scrollTo(0,0);
