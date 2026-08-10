@@ -104,6 +104,9 @@
   .chip.chip-full{display:flex;align-items:flex-start;gap:10px;width:100%;text-align:left;padding:12px 14px;border-radius:12px;font-size:13px;line-height:1.45;margin-bottom:8px}
   .chip.chip-full::before{content:'☐';font-size:17px;flex-shrink:0;line-height:1.3}
   .chip.chip-full.sel::before{content:'☑';color:#fff}
+  .chip-full-texto{flex:1}
+  .katz-pts{margin-left:8px;flex-shrink:0;font-weight:800;font-size:14px;background:#eef2f2;color:var(--muted);border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center}
+  .chip.chip-full.sel .katz-pts{background:rgba(255,255,255,.28);color:#fff}
   .pin-btn{aspect-ratio:1;border-radius:16px;border:1px solid var(--borda);background:#fff;font-size:22px;font-weight:700;color:var(--txt)}
   .pin-btn:active{background:var(--teal);color:#fff}
 
@@ -1474,8 +1477,8 @@
         ${KATZ_ITENS.map(it => `
           <div style="font-size:15px;font-weight:700;color:var(--teal-esc);margin:16px 0 8px">${esc(it.label)}</div>
           <div id="katz-${it.chave}">
-            <div class="chip chip-full" data-valor="1">${esc(it.texto1)}</div>
-            <div class="chip chip-full" data-valor="0">${esc(it.texto0)}</div>
+            <div class="chip chip-full" data-valor="1"><span class="chip-full-texto">${esc(it.texto1)}</span><span class="katz-pts">1</span></div>
+            <div class="chip chip-full" data-valor="0"><span class="chip-full-texto">${esc(it.texto0)}</span><span class="katz-pts">0</span></div>
           </div>
         `).join('')}
         <div style="display:flex;justify-content:space-between;align-items:center;margin:20px 0 6px">
