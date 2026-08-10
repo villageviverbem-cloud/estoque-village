@@ -207,7 +207,16 @@
     });
     if(!r.ok){
       let detalhe = '';
-      try{ const d = await r.json(); detalhe = d.message || d.hint || d.details || ''; }catch(_e){}
+      try{
+        const texto = await r.text();
+        try{
+          const d = JSON.parse(texto);
+          detalhe = d.message || d.hint || d.details || d.code || texto;
+        }catch(_eJson){
+          detalhe = texto;
+        }
+      }catch(_e){}
+      detalhe = (detalhe || '').toString().slice(0, 200);
       throw new Error('Erro ' + r.status + ' ao gravar' + (detalhe ? ' — ' + detalhe : ''));
     }
   }
