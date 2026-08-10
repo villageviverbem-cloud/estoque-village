@@ -125,6 +125,9 @@
 
   // ==== App financeiro (DRE, folha, contas a pagar etc.) — sistema próprio, hospedado à parte ====
   const APP_FINANCEIRO = 'https://villageviverbem-cloud.github.io/Village-Financeiro/';
+  // Moradores e Equipe são abertos direto do menu do ILPI (em aba nova), então o
+  // "Voltar" delas leva de volta pro ILPI em vez de para o início deste app.
+  const ILPI_URL = 'https://eduardonoronha9.app.n8n.cloud/webhook/ilpi';
 
   const SETORES_ESTOQUE = {
     cozinha:    {icone:'🍳', nome:'Cozinha'},
@@ -573,7 +576,7 @@
   function telaMoradores(){
     app.innerHTML = `
       <div class="topo" style="background:linear-gradient(120deg,var(--teal),var(--verde))">
-        <button class="voltar" onclick="location.hash='inicio'">← Voltar ao início</button>
+        <button class="voltar" onclick="location.href=ILPI_URL">← Voltar</button>
         <h1>🧑‍🦳 Moradores</h1>
         <p>Residentes cadastrados</p>
         <button class="atualizado" onclick="carregarMoradores()">🔄 <span id="quando">Carregando...</span></button>
@@ -682,7 +685,7 @@
   function telaFuncionarios(){
     app.innerHTML = `
       <div class="topo" style="background:linear-gradient(120deg,#9070c0,#7a5fb0)">
-        <button class="voltar" onclick="location.hash='inicio'">← Voltar ao início</button>
+        <button class="voltar" onclick="location.href=ILPI_URL">← Voltar</button>
         <h1>🧑‍⚕️ Equipe</h1>
         <p>Escolha quem está usando o app agora</p>
       </div>
