@@ -623,7 +623,7 @@
         moradorNomeCache = {};
         moradores.forEach(m=>{ moradorNomeCache[m.id] = m.nome; });
         el.querySelectorAll('.js-morador').forEach(div=>{
-          div.addEventListener('click', ()=>{ location.hash = 'morador-' + div.dataset.id; });
+          tornarClicavel(div, ()=>{ location.hash = 'morador-' + div.dataset.id; });
         });
         el.querySelectorAll('[data-stop]').forEach(a=>{
           a.addEventListener('click', e=>e.stopPropagation());
@@ -672,6 +672,17 @@
       return false;
     }
     return true;
+  }
+
+  // Deixa uma <div> clicável também navegável/ativável por teclado (Tab + Enter/Espaço),
+  // já que ela substitui um <a> que teria isso de graça.
+  function tornarClicavel(el, fn){
+    el.setAttribute('tabindex', '0');
+    el.setAttribute('role', 'button');
+    el.addEventListener('click', fn);
+    el.addEventListener('keydown', e=>{
+      if(e.key==='Enter' || e.key===' '){ e.preventDefault(); fn(); }
+    });
   }
 
   function ligarChips(containerId, onSelect){
@@ -724,7 +735,7 @@
         </div>`;
       }).join('');
       el.querySelectorAll('.js-func').forEach(div=>{
-        div.addEventListener('click', ()=>abrirPinFuncionario(div.dataset.id, div.dataset.nome));
+        tornarClicavel(div, ()=>abrirPinFuncionario(div.dataset.id, div.dataset.nome));
       });
     }catch(e){
       if(token !== viewToken) return;
@@ -874,32 +885,32 @@
       if(!m){ area.innerHTML = '<div class="estado">Morador não encontrado.</div>'; return; }
       moradorNomeCache[m.id] = m.nome;
       document.getElementById('mf-nome').textContent = m.nome || '—';
+      const acoes = [
+        {chave:'agua', ico:'💧', bg:'#eaf1fb', cor:'#4a6fa5', nome:'Bebeu água / Hidratação', desc:'Registrar copos de água'},
+        {chave:'fralda', ico:'🧷', bg:'#fdecec', cor:'#c85a5a', nome:'Checar / Trocar fralda', desc:'Registrar situação e troca'},
+        {chave:'alimentacao', ico:'🍽️', bg:'#fef2e8', cor:'#c77b3b', nome:'Alimentação', desc:'Registrar refeição e aceitação'},
+        {chave:'katz', ico:'📋', bg:'#f0ecfb', cor:'#7a5fb0', nome:'Escala de Katz', desc:'Avaliação de dependência (AVDs)'}
+      ];
       area.innerHTML = `
         <div class="opcoes">
-          <a class="opcao" href="#registrar-agua-${esc(id)}">
-            <div class="ico" style="background:#eaf1fb;color:#4a6fa5">💧</div>
-            <div class="txt"><div class="nome">Bebeu água / Hidratação</div><div class="desc">Registrar copos de água</div></div>
-            <div class="seta" style="color:var(--teal)">→</div>
-          </a>
-          <a class="opcao" href="#registrar-fralda-${esc(id)}">
-            <div class="ico" style="background:#fdecec;color:#c85a5a">🧷</div>
-            <div class="txt"><div class="nome">Checar / Trocar fralda</div><div class="desc">Registrar situação e troca</div></div>
-            <div class="seta" style="color:var(--teal)">→</div>
-          </a>
-          <a class="opcao" href="#registrar-alimentacao-${esc(id)}">
-            <div class="ico" style="background:#fef2e8;color:#c77b3b">🍽️</div>
-            <div class="txt"><div class="nome">Alimentação</div><div class="desc">Registrar refeição e aceitação</div></div>
-            <div class="seta" style="color:var(--teal)">→</div>
-          </a>
-          <a class="opcao" href="#katz-${esc(id)}">
-            <div class="ico" style="background:#f0ecfb;color:#7a5fb0">📋</div>
-            <div class="txt"><div class="nome">Escala de Katz</div><div class="desc">Avaliação de dependência (AVDs)</div></div>
-            <div class="seta" style="color:var(--teal)">→</div>
-          </a>
+          ${acoes.map(a => `
+            <div class="opcao js-abrir-acao" data-hash="${a.chave === 'katz' ? 'katz' : 'registrar-'+a.chave}-${esc(id)}" style="cursor:pointer">
+              <div class="ico" style="background:${a.bg};color:${a.cor}">${a.ico}</div>
+              <div class="txt"><div class="nome">${a.nome}</div><div class="desc">${a.desc}</div></div>
+              <a class="btn-scan" href="#editar-${a.chave}-${esc(id)}" data-stop="1" style="margin-right:8px">✏️ Editar</a>
+              <div class="seta" style="color:var(--teal)">→</div>
+            </div>
+          `).join('')}
         </div>
         <div class="setor-titulo" style="margin:20px 16px 10px">🕒 Últimos registros</div>
         <div id="mf-historico" class="wrap"><div class="estado"><div class="spin"></div>Buscando histórico...</div></div>
       `;
+      area.querySelectorAll('.js-abrir-acao').forEach(div=>{
+        tornarClicavel(div, ()=>{ location.hash = div.dataset.hash; });
+      });
+      area.querySelectorAll('[data-stop]').forEach(a=>{
+        a.addEventListener('click', e=>e.stopPropagation());
+      });
       carregarHistoricoCuidado(id, token);
     }catch(e){
       if(token !== viewToken) return;
@@ -909,20 +920,31 @@
 
   async function carregarHistoricoCuidado(id, token){
     try{
-      const regs = await api('registros_cuidado?select=*&morador_id=eq.'+encodeURIComponent(id)+'&order=data_hora.desc&limit=15');
+      const [regsResult, katzResult] = await Promise.allSettled([
+        api('registros_cuidado?select=*&morador_id=eq.'+encodeURIComponent(id)+'&order=data_hora.desc&limit=15'),
+        api('avaliacoes_katz?select=*&morador_id=eq.'+encodeURIComponent(id)+'&order=data_hora.desc&limit=15')
+      ]);
+      // Cada tabela é buscada de forma independente: se uma ainda não existir
+      // (ex: avaliacoes_katz não criada ainda), a outra continua aparecendo normal.
+      const regs = regsResult.status === 'fulfilled' ? regsResult.value : [];
+      const katz = katzResult.status === 'fulfilled' ? katzResult.value : [];
       if(token !== viewToken) return;
       const el = document.getElementById('mf-historico');
       if(!el) return;
-      if(!regs.length){ el.innerHTML = '<div class="estado">Nenhum registro ainda.</div>'; return; }
-      const icones = {agua:'💧', fralda:'🧷', alimentacao:'🍽️'};
-      el.innerHTML = regs.map(r=>{
+      const itens = [
+        ...regs.map(r => ({tipo: r.tipo, valor: r.valor, quem: r.funcionario_nome, data_hora: r.data_hora})),
+        ...katz.map(k => ({tipo: 'katz', valor: 'Escala de Katz — ' + (k.classificacao||'') + ' (' + (k.escore_total ?? '—') + '/6)', quem: k.avaliador, data_hora: k.data_hora}))
+      ].sort((a,b) => new Date(b.data_hora) - new Date(a.data_hora)).slice(0, 15);
+      if(!itens.length){ el.innerHTML = '<div class="estado">Nenhum registro ainda.</div>'; return; }
+      const icones = {agua:'💧', fralda:'🧷', alimentacao:'🍽️', katz:'📋'};
+      el.innerHTML = itens.map(r=>{
         const d = r.data_hora ? new Date(r.data_hora) : null;
         const dstr = d ? d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+' às '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) : '';
         return `<div class="mov">
           <div class="ico">${icones[r.tipo]||'📝'}</div>
           <div class="info">
             <div class="t">${esc(r.valor||'')}</div>
-            <div class="d">${dstr}${r.funcionario_nome ? ' · '+esc(r.funcionario_nome) : ''}</div>
+            <div class="d">${dstr}${r.quem ? ' · '+esc(r.quem) : ''}</div>
           </div>
         </div>`;
       }).join('');
@@ -947,16 +969,19 @@
     }
   };
   let cuidadoSelecionado = null;
+  let cuidadoEditandoId = null; // null = criando novo registro; senão, id do registro sendo editado
 
-  function telaRegistrarSimples(tipo, moradorId){
-    const hashAtual = 'registrar-' + tipo + '-' + moradorId;
+  function telaRegistrarSimples(tipo, moradorId, editar){
+    const hashAtual = (editar ? 'editar-' : 'registrar-') + tipo + '-' + moradorId;
     if(!exigirFuncionario(hashAtual)) return;
     cuidadoSelecionado = null;
+    cuidadoEditandoId = null;
     const cfg = CUIDADO_CONFIG[tipo];
     app.innerHTML = `
       <div class="topo" style="background:linear-gradient(120deg,${cfg.cor},${cfg.cor})">
         <button class="voltar" id="btn-voltar-morador">← Voltar</button>
         <h1>${cfg.titulo}</h1>
+        ${editar ? '<p>Editando o último registro</p>' : ''}
       </div>
       ${bannerFuncionario(hashAtual)}
       <div class="wrap">
@@ -966,31 +991,77 @@
         </div>
         <label style="font-size:12.5px;color:var(--muted);display:block;margin:14px 0 4px">Observação (opcional)</label>
         <textarea id="cd-obs" rows="2" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px"></textarea>
-        <button id="cd-salvar" style="width:100%;background:${cfg.cor};color:#fff;border:none;border-radius:14px;padding:14px;font-size:15px;font-weight:700;margin-top:14px">Registrar</button>
+        <button id="cd-salvar" style="width:100%;background:${cfg.cor};color:#fff;border:none;border-radius:14px;padding:14px;font-size:15px;font-weight:700;margin-top:14px">${editar ? 'Salvar alteração' : 'Registrar'}</button>
         <div id="cd-msg" style="text-align:center;font-size:12.5px;color:var(--muted);margin-top:10px"></div>
       </div>
     `;
     document.getElementById('btn-voltar-morador').addEventListener('click', () => { location.hash = 'morador-' + moradorId; });
     ligarChips('cd-chips', v => cuidadoSelecionado = v);
     document.getElementById('cd-salvar').addEventListener('click', () => salvarCuidado(tipo, moradorId));
+    if(editar){
+      const btnSalvar = document.getElementById('cd-salvar');
+      if(btnSalvar) btnSalvar.disabled = true;
+      carregarUltimoCuidado(tipo, moradorId);
+    }
+  }
+
+  async function carregarUltimoCuidado(tipo, moradorId){
+    const token = viewToken;
+    const msg = document.getElementById('cd-msg');
+    try{
+      const rows = await api('registros_cuidado?select=*&tipo=eq.'+encodeURIComponent(tipo)+'&morador_id=eq.'+encodeURIComponent(moradorId)+'&order=data_hora.desc&limit=1');
+      if(token !== viewToken) return;
+      if(!rows.length){
+        if(msg) msg.textContent = 'Nenhum registro anterior desse tipo ainda — isso vai criar um novo.';
+        return;
+      }
+      const r = rows[0];
+      cuidadoEditandoId = r.id;
+      const cont = document.getElementById('cd-chips');
+      if(cont){
+        cont.querySelectorAll('.chip').forEach(c=>{
+          const sel = c.dataset.valor === r.valor;
+          c.classList.toggle('sel', sel);
+        });
+      }
+      cuidadoSelecionado = r.valor;
+      const obsEl = document.getElementById('cd-obs');
+      if(obsEl) obsEl.value = r.observacao || '';
+    }catch(e){
+      if(token !== viewToken) return;
+      if(msg) msg.textContent = '⚠️ Não consegui carregar o registro anterior: ' + esc(e.message);
+    }finally{
+      if(token === viewToken){
+        const btnSalvar = document.getElementById('cd-salvar');
+        if(btnSalvar) btnSalvar.disabled = false;
+      }
+    }
   }
 
   async function salvarCuidado(tipo, moradorId){
     const msg = document.getElementById('cd-msg');
     if(!cuidadoSelecionado){ msg.textContent = 'Escolha uma opção.'; return; }
     const f = funcionarioAtual();
-    if(!f){ location.hash = 'funcionarios?v=' + encodeURIComponent('registrar-'+tipo+'-'+moradorId); return; }
+    if(!f){ location.hash = 'funcionarios?v=' + encodeURIComponent((cuidadoEditandoId?'editar-':'registrar-')+tipo+'-'+moradorId); return; }
     const obs = document.getElementById('cd-obs').value.trim();
     msg.textContent = 'Salvando...';
     const btn = document.getElementById('cd-salvar');
     if(btn) btn.disabled = true;
     try{
-      const moradorNome = await nomeDoMorador(moradorId);
-      await apiWrite('registros_cuidado', 'POST', {
-        morador_id: moradorId, morador_nome: moradorNome, tipo, valor: cuidadoSelecionado,
-        observacao: obs || null, funcionario_id: f.id, funcionario_nome: f.nome,
-        data_hora: new Date().toISOString()
-      });
+      if(cuidadoEditandoId){
+        // Corrige só o conteúdo — mantém quem registrou e quando de verdade aconteceu,
+        // pra não perder a responsabilização do registro original.
+        await apiWrite('registros_cuidado?id=eq.'+encodeURIComponent(cuidadoEditandoId), 'PATCH', {
+          valor: cuidadoSelecionado, observacao: obs || null
+        });
+      }else{
+        const moradorNome = await nomeDoMorador(moradorId);
+        await apiWrite('registros_cuidado', 'POST', {
+          morador_id: moradorId, morador_nome: moradorNome, tipo, valor: cuidadoSelecionado,
+          observacao: obs || null, funcionario_id: f.id, funcionario_nome: f.nome,
+          data_hora: new Date().toISOString()
+        });
+      }
       location.hash = 'morador-' + moradorId;
     }catch(e){
       msg.textContent = '⚠️ Erro: ' + esc(e.message) + '. Se a tabela "registros_cuidado" não existe, rode o SQL que te mandei.';
@@ -1004,16 +1075,19 @@
   const ALIMENTACAO_ACEITACAO = ['Aceitou tudo','Aceitou parcialmente','Recusou'];
   let alimentacaoRefeicao = null;
   let alimentacaoAceitacao = null;
+  let alimentacaoEditandoId = null;
 
-  function telaRegistrarAlimentacao(moradorId){
-    const hashAtual = 'registrar-alimentacao-' + moradorId;
+  function telaRegistrarAlimentacao(moradorId, editar){
+    const hashAtual = (editar ? 'editar-' : 'registrar-') + 'alimentacao-' + moradorId;
     if(!exigirFuncionario(hashAtual)) return;
     alimentacaoRefeicao = null;
     alimentacaoAceitacao = null;
+    alimentacaoEditandoId = null;
     app.innerHTML = `
       <div class="topo" style="background:linear-gradient(120deg,#e8933f,#c77b3b)">
         <button class="voltar" id="btn-voltar-morador">← Voltar</button>
         <h1>🍽️ Alimentação</h1>
+        ${editar ? '<p>Editando o último registro</p>' : ''}
       </div>
       ${bannerFuncionario(hashAtual)}
       <div class="wrap">
@@ -1027,7 +1101,7 @@
         </div>
         <label style="font-size:12.5px;color:var(--muted);display:block;margin:14px 0 4px">Observação (opcional)</label>
         <textarea id="cd-obs" rows="2" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px"></textarea>
-        <button id="cd-salvar" style="width:100%;background:#c77b3b;color:#fff;border:none;border-radius:14px;padding:14px;font-size:15px;font-weight:700;margin-top:14px">Registrar</button>
+        <button id="cd-salvar" style="width:100%;background:#c77b3b;color:#fff;border:none;border-radius:14px;padding:14px;font-size:15px;font-weight:700;margin-top:14px">${editar ? 'Salvar alteração' : 'Registrar'}</button>
         <div id="cd-msg" style="text-align:center;font-size:12.5px;color:var(--muted);margin-top:10px"></div>
       </div>
     `;
@@ -1035,25 +1109,76 @@
     ligarChips('al-refeicao', v => alimentacaoRefeicao = v);
     ligarChips('al-aceitacao', v => alimentacaoAceitacao = v);
     document.getElementById('cd-salvar').addEventListener('click', () => salvarAlimentacao(moradorId));
+    if(editar){
+      const btnSalvar = document.getElementById('cd-salvar');
+      if(btnSalvar) btnSalvar.disabled = true;
+      carregarUltimaAlimentacao(moradorId);
+    }
+  }
+
+  async function carregarUltimaAlimentacao(moradorId){
+    const token = viewToken;
+    const msg = document.getElementById('cd-msg');
+    try{
+      const rows = await api('registros_cuidado?select=*&tipo=eq.alimentacao&morador_id=eq.'+encodeURIComponent(moradorId)+'&order=data_hora.desc&limit=1');
+      if(token !== viewToken) return;
+      if(!rows.length){
+        if(msg) msg.textContent = 'Nenhum registro anterior ainda — isso vai criar um novo.';
+        return;
+      }
+      const r = rows[0];
+      alimentacaoEditandoId = r.id;
+      const partes = (r.valor || '').split(' - ');
+      const refeicaoSalva = partes[0] || '';
+      const aceitacaoSalva = partes[1] || '';
+      const refCont = document.getElementById('al-refeicao');
+      refCont.querySelectorAll('.chip').forEach(c=>{
+        const sel = c.dataset.valor === refeicaoSalva;
+        c.classList.toggle('sel', sel);
+        if(sel) alimentacaoRefeicao = c.dataset.valor;
+      });
+      const aceCont = document.getElementById('al-aceitacao');
+      aceCont.querySelectorAll('.chip').forEach(c=>{
+        const sel = c.dataset.valor.toLowerCase() === aceitacaoSalva.toLowerCase();
+        c.classList.toggle('sel', sel);
+        if(sel) alimentacaoAceitacao = c.dataset.valor;
+      });
+      const obsEl = document.getElementById('cd-obs');
+      if(obsEl) obsEl.value = r.observacao || '';
+    }catch(e){
+      if(token !== viewToken) return;
+      if(msg) msg.textContent = '⚠️ Não consegui carregar o registro anterior: ' + esc(e.message);
+    }finally{
+      if(token === viewToken){
+        const btnSalvar = document.getElementById('cd-salvar');
+        if(btnSalvar) btnSalvar.disabled = false;
+      }
+    }
   }
 
   async function salvarAlimentacao(moradorId){
     const msg = document.getElementById('cd-msg');
     if(!alimentacaoRefeicao || !alimentacaoAceitacao){ msg.textContent = 'Escolha a refeição e a aceitação.'; return; }
     const f = funcionarioAtual();
-    if(!f){ location.hash = 'funcionarios?v=' + encodeURIComponent('registrar-alimentacao-'+moradorId); return; }
+    if(!f){ location.hash = 'funcionarios?v=' + encodeURIComponent((alimentacaoEditandoId?'editar-':'registrar-')+'alimentacao-'+moradorId); return; }
     const obs = document.getElementById('cd-obs').value.trim();
     msg.textContent = 'Salvando...';
     const btn = document.getElementById('cd-salvar');
     if(btn) btn.disabled = true;
     try{
-      const moradorNome = await nomeDoMorador(moradorId);
       const valor = alimentacaoRefeicao + ' - ' + alimentacaoAceitacao.charAt(0).toLowerCase() + alimentacaoAceitacao.slice(1);
-      await apiWrite('registros_cuidado', 'POST', {
-        morador_id: moradorId, morador_nome: moradorNome, tipo: 'alimentacao', valor,
-        observacao: obs || null, funcionario_id: f.id, funcionario_nome: f.nome,
-        data_hora: new Date().toISOString()
-      });
+      if(alimentacaoEditandoId){
+        await apiWrite('registros_cuidado?id=eq.'+encodeURIComponent(alimentacaoEditandoId), 'PATCH', {
+          valor, observacao: obs || null
+        });
+      }else{
+        const moradorNome = await nomeDoMorador(moradorId);
+        await apiWrite('registros_cuidado', 'POST', {
+          morador_id: moradorId, morador_nome: moradorNome, tipo: 'alimentacao', valor,
+          observacao: obs || null, funcionario_id: f.id, funcionario_nome: f.nome,
+          data_hora: new Date().toISOString()
+        });
+      }
       location.hash = 'morador-' + moradorId;
     }catch(e){
       msg.textContent = '⚠️ Erro: ' + esc(e.message) + '.';
@@ -1072,6 +1197,7 @@
     {chave:'alimentacao', label:'Alimentação'}
   ];
   let katzRespostas = {};
+  let katzEditandoId = null;
 
   function classificarKatz(escore){
     if(escore === 6) return 'Independente';
@@ -1080,15 +1206,16 @@
     return 'Muito dependente';
   }
 
-  function telaKatz(moradorId){
-    const hashAtual = 'katz-' + moradorId;
+  function telaKatz(moradorId, editar){
+    const hashAtual = (editar ? 'editar-katz-' : 'katz-') + moradorId;
     if(!exigirFuncionario(hashAtual)) return;
     katzRespostas = {};
+    katzEditandoId = null;
     app.innerHTML = `
       <div class="topo" style="background:linear-gradient(120deg,#9070c0,#7a5fb0)">
         <button class="voltar" id="btn-voltar-morador">← Voltar</button>
         <h1>📋 Escala de Katz</h1>
-        <p>Grau de dependência (AVDs)</p>
+        <p>${editar ? 'Editando a última avaliação' : 'Grau de dependência (AVDs)'}</p>
       </div>
       ${bannerFuncionario(hashAtual)}
       <div class="wrap">
@@ -1106,7 +1233,7 @@
         <div id="katz-classificacao" style="text-align:center;font-size:13px;color:var(--muted);margin-bottom:14px">Responda todos os itens</div>
         <label style="font-size:12.5px;color:var(--muted);display:block;margin:8px 0 4px">Observações (opcional)</label>
         <textarea id="katz-obs" rows="2" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px"></textarea>
-        <button id="katz-salvar" style="width:100%;background:#7a5fb0;color:#fff;border:none;border-radius:14px;padding:14px;font-size:15px;font-weight:700;margin-top:14px">Salvar avaliação</button>
+        <button id="katz-salvar" style="width:100%;background:#7a5fb0;color:#fff;border:none;border-radius:14px;padding:14px;font-size:15px;font-weight:700;margin-top:14px">${editar ? 'Salvar alteração' : 'Salvar avaliação'}</button>
         <div id="katz-msg" style="text-align:center;font-size:12.5px;color:var(--muted);margin-top:10px"></div>
       </div>
     `;
@@ -1115,6 +1242,48 @@
       ligarChips('katz-' + it.chave, v => { katzRespostas[it.chave] = Number(v); atualizarEscoreKatz(); });
     });
     document.getElementById('katz-salvar').addEventListener('click', () => salvarKatz(moradorId));
+    if(editar){
+      const btnSalvar = document.getElementById('katz-salvar');
+      if(btnSalvar) btnSalvar.disabled = true;
+      carregarUltimoKatz(moradorId);
+    }
+  }
+
+  async function carregarUltimoKatz(moradorId){
+    const token = viewToken;
+    const msg = document.getElementById('katz-msg');
+    try{
+      const rows = await api('avaliacoes_katz?select=*&morador_id=eq.'+encodeURIComponent(moradorId)+'&order=data_hora.desc&limit=1');
+      if(token !== viewToken) return;
+      if(!rows.length){
+        if(msg) msg.textContent = 'Nenhuma avaliação anterior ainda — isso vai criar uma nova.';
+        return;
+      }
+      const r = rows[0];
+      katzEditandoId = r.id;
+      KATZ_ITENS.forEach(it => {
+        const valor = r[it.chave];
+        if(valor === null || valor === undefined) return;
+        katzRespostas[it.chave] = Number(valor);
+        const cont = document.getElementById('katz-' + it.chave);
+        if(cont){
+          cont.querySelectorAll('.chip').forEach(c => {
+            c.classList.toggle('sel', Number(c.dataset.valor) === Number(valor));
+          });
+        }
+      });
+      atualizarEscoreKatz();
+      const obsEl = document.getElementById('katz-obs');
+      if(obsEl) obsEl.value = r.observacoes || '';
+    }catch(e){
+      if(token !== viewToken) return;
+      if(msg) msg.textContent = '⚠️ Não consegui carregar a avaliação anterior: ' + esc(e.message);
+    }finally{
+      if(token === viewToken){
+        const btnSalvar = document.getElementById('katz-salvar');
+        if(btnSalvar) btnSalvar.disabled = false;
+      }
+    }
   }
 
   function atualizarEscoreKatz(){
@@ -1135,7 +1304,7 @@
     const valores = KATZ_ITENS.map(it => katzRespostas[it.chave]);
     if(valores.some(v => v === undefined)){ msg.textContent = 'Responda todos os itens antes de salvar.'; return; }
     const f = funcionarioAtual();
-    if(!f){ location.hash = 'funcionarios?v=' + encodeURIComponent('katz-'+moradorId); return; }
+    if(!f){ location.hash = 'funcionarios?v=' + encodeURIComponent((katzEditandoId?'editar-katz-':'katz-')+moradorId); return; }
     const escore = valores.reduce((s,v) => s+v, 0);
     const classificacao = classificarKatz(escore);
     const obs = document.getElementById('katz-obs').value.trim();
@@ -1143,14 +1312,22 @@
     const btn = document.getElementById('katz-salvar');
     if(btn) btn.disabled = true;
     try{
-      const moradorNome = await nomeDoMorador(moradorId);
-      await apiWrite('avaliacoes_katz', 'POST', {
-        morador_id: moradorId, morador_nome: moradorNome, avaliador: f.nome,
+      const respostas = {
         banho: katzRespostas.banho, vestir: katzRespostas.vestir, banheiro: katzRespostas.banheiro,
         transferencia: katzRespostas.transferencia, continencia: katzRespostas.continencia,
         alimentacao: katzRespostas.alimentacao, escore_total: escore, classificacao,
-        observacoes: obs || null, data_hora: new Date().toISOString()
-      });
+        observacoes: obs || null
+      };
+      if(katzEditandoId){
+        // Corrige só as respostas — mantém quem avaliou e quando de verdade foi feito.
+        await apiWrite('avaliacoes_katz?id=eq.'+encodeURIComponent(katzEditandoId), 'PATCH', respostas);
+      }else{
+        const moradorNome = await nomeDoMorador(moradorId);
+        await apiWrite('avaliacoes_katz', 'POST', {
+          morador_id: moradorId, morador_nome: moradorNome, avaliador: f.nome,
+          data_hora: new Date().toISOString(), ...respostas
+        });
+      }
       location.hash = 'morador-' + moradorId;
     }catch(e){
       msg.textContent = '⚠️ Erro: ' + esc(e.message) + '. Se a tabela "avaliacoes_katz" não existe, rode o SQL que te mandei.';
@@ -1175,6 +1352,10 @@
     else if((m = apósPrefixo(hash, 'leitor-')) !== null) telaLeitor(m);
     else if(hash === 'funcionarios') telaFuncionarios();
     else if(hash === 'funcionarios-novo') telaFuncionarioNovo();
+    else if((m = apósPrefixo(hash, 'editar-agua-')) !== null) telaRegistrarSimples('agua', m, true);
+    else if((m = apósPrefixo(hash, 'editar-fralda-')) !== null) telaRegistrarSimples('fralda', m, true);
+    else if((m = apósPrefixo(hash, 'editar-alimentacao-')) !== null) telaRegistrarAlimentacao(m, true);
+    else if((m = apósPrefixo(hash, 'editar-katz-')) !== null) telaKatz(m, true);
     else if((m = apósPrefixo(hash, 'registrar-agua-')) !== null) telaRegistrarSimples('agua', m);
     else if((m = apósPrefixo(hash, 'registrar-fralda-')) !== null) telaRegistrarSimples('fralda', m);
     else if((m = apósPrefixo(hash, 'registrar-alimentacao-')) !== null) telaRegistrarAlimentacao(m);
