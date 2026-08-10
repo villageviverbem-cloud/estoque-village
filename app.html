@@ -133,12 +133,7 @@
   // e deixando aquela aba original em primeiro plano, e fecha esta. Se não tiver
   // como (ex: alguém abriu este link direto, sem vir do ILPI), aí sim navega pra lá.
   function voltarParaIlpi(){
-    if(window.opener && !window.opener.closed){
-      window.opener.focus();
-      window.close();
-    }else{
-      location.href = ILPI_URL;
-    }
+    window.close();
   }
 
   const SETORES_ESTOQUE = {
@@ -588,7 +583,7 @@
   function telaMoradores(){
     app.innerHTML = `
       <div class="topo" style="background:linear-gradient(120deg,var(--teal),var(--verde))">
-        <button class="voltar" onclick="voltarParaIlpi()">← Voltar</button>
+        <button class="voltar" onclick="voltarParaIlpi()">✕ Fechar e voltar pro ILPI</button>
         <h1>🧑‍🦳 Moradores</h1>
         <p>Residentes cadastrados</p>
         <button class="atualizado" onclick="carregarMoradores()">🔄 <span id="quando">Carregando...</span></button>
@@ -697,7 +692,7 @@
   function telaFuncionarios(){
     app.innerHTML = `
       <div class="topo" style="background:linear-gradient(120deg,#9070c0,#7a5fb0)">
-        <button class="voltar" onclick="voltarParaIlpi()">← Voltar</button>
+        <button class="voltar" onclick="voltarParaIlpi()">✕ Fechar e voltar pro ILPI</button>
         <h1>🧑‍⚕️ Equipe</h1>
         <p>Escolha quem está usando o app agora</p>
       </div>
