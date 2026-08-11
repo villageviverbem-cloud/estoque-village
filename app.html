@@ -143,11 +143,11 @@
   const FARMACIA_INSUMOS_URL = 'https://eduardonoronha9.app.n8n.cloud/webhook/estoque-insumos';
   const COZINHA_PAINEL_URL = 'https://eduardonoronha9.app.n8n.cloud/webhook/estoque-cozinha-painel';
   const LAVANDERIA_PAINEL_URL = 'https://eduardonoronha9.app.n8n.cloud/webhook/lavanderia-painel';
-  // Nomes de campo (resident/medication) são um "melhor palpite" seguindo o padrão dos
-  // outros painéis — não vimos o código-fonte real desse (a página é grande demais pra
-  // copiar). Pode precisar de ajuste depois de testar.
+  // Farmácia-Medicamentos foi removida do Leitor: é dado clínico por residente e exige
+  // Dose/Unidade batendo exatamente com o que já está prescrito, senão cria registro
+  // fantasma duplicado (aconteceu em teste real). Fica só na tela real mesmo.
   const FARMACIA_MEDICAMENTOS_URL = 'https://eduardonoronha9.app.n8n.cloud/webhook/farmacia-medicamentos';
-  const SETORES_INTEGRADOS = ['farmacia', 'cozinha', 'lavanderia', 'farmacia-medicamentos'];
+  const SETORES_INTEGRADOS = ['farmacia', 'cozinha', 'lavanderia'];
   function voltarParaIlpi(){
     location.href = ILPI_URL;
   }
@@ -342,17 +342,13 @@
   // ---------- LEITOR RÁPIDO (lê o código, busca no nosso banco e, se não achar, tenta o nome numa base pública) ----------
   let leitorSalvando = false;
 
-  // Farmácia-Medicamentos não é um setor de estoque genérico (não tem tela própria de
-  // opções, moradores etc.) — existe só como um destino do Leitor, então usa um estilo
-  // próprio em vez de entrar na lista SETORES (pra não criar uma tela de setor solta).
   function estiloLeitor(chave){
-    if(chave === 'farmacia-medicamentos'){
-      return { nome: 'Farmácia — Medicamentos', grad: ['var(--teal)','var(--verde)'], cor: '#2f6f6e' };
-    }
     return SETORES[chave];
   }
 
   function telaLeitor(chave){
+    // Link antigo do tile removido — manda direto pra tela real em vez de dar tela em branco.
+    if(chave === 'farmacia-medicamentos'){ location.href = FARMACIA_MEDICAMENTOS_URL; return; }
     const s = estiloLeitor(chave);
     if(!s){ location.hash = 'inicio'; return; }
     const integrado = SETORES_INTEGRADOS.includes(chave);
@@ -445,19 +441,17 @@
     formEl.classList.remove('oculto');
     const nome = produto ? produto.nome : nomeSugerido;
     const unidade = produto ? (produto.unidade || 'un') : 'un';
-    // Cada setor integrado (farmácia = insumos, cozinha, lavanderia, farmácia-medicamentos)
-    // manda pro painel real do n8n com o formato de campos que cada um já espera — por isso
-    // os campos mostrados mudam por setor. Secretaria/Enfermagem (sem painel real ainda)
-    // seguem no formato genérico antigo.
+    // Cada setor integrado (farmácia = insumos, cozinha, lavanderia) manda pro painel real
+    // do n8n com o formato de campos que cada um já espera — por isso os campos mostrados
+    // mudam por setor. Secretaria/Enfermagem (sem painel real ainda) seguem no formato
+    // genérico antigo.
     const ehLavanderia = setorChave === 'lavanderia';
     const ehCozinha = setorChave === 'cozinha';
     const ehFarmacia = setorChave === 'farmacia';
-    const ehMedicamentos = setorChave === 'farmacia-medicamentos';
     const mostrarUnidade = !ehLavanderia;
-    const mostrarLote = !ehLavanderia && !ehCozinha && !ehMedicamentos;
-    const mostrarValidade = !ehLavanderia && !ehMedicamentos;
+    const mostrarLote = !ehLavanderia && !ehCozinha;
+    const mostrarValidade = !ehLavanderia;
     const mostrarMorador = ehLavanderia || (!ehCozinha && !ehFarmacia);
-    const moradorObrigatorio = ehLavanderia || ehMedicamentos;
     formEl.innerHTML = `
       <div class="item" style="margin-bottom:14px">
         <div>
@@ -470,26 +464,24 @@
         const nomeSetor = chaveEncontrada ? SETORES[chaveEncontrada].nome : produto.setor;
         return `<div style="background:#fff6e0;color:#8a6000;border-radius:10px;padding:10px 12px;margin-bottom:14px;font-size:13px">⚠️ Esse código já está cadastrado no setor <b>${esc(nomeSetor)}</b>. O código de barras é único no sistema, então essa movimentação vai atualizar o mesmo produto.</div>`;
       })() : ''}
-      <label style="font-size:12.5px;color:var(--muted);display:block;margin-bottom:4px">${ehLavanderia ? 'Peça de roupa' : ehMedicamentos ? 'Medicação' : 'Nome do produto'}</label>
-      <input id="f-nome" type="text" value="${esc(nome)}" placeholder="${ehLavanderia ? 'Ex.: Lençol, Calça' : ehMedicamentos ? 'Ex.: AAS 100mg' : ''}" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;margin-bottom:12px;font-size:14px">
-      ${ehMedicamentos ? `<label style="font-size:12.5px;color:var(--muted);display:block;margin-bottom:4px">Dose (ex: 100 mg)</label>
-      <input id="f-dose" type="text" placeholder="Opcional" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;margin-bottom:12px;font-size:14px">` : ''}
-      ${mostrarUnidade ? `<label style="font-size:12.5px;color:var(--muted);display:block;margin-bottom:4px">Unidade${ehMedicamentos ? ' (ex: cp, mL, gtt)' : ' (ex: un, cx, kg)'}</label>
-      <input id="f-unidade" type="text" value="${ehMedicamentos ? '' : esc(unidade)}" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;margin-bottom:12px;font-size:14px">` : ''}
+      <label style="font-size:12.5px;color:var(--muted);display:block;margin-bottom:4px">${ehLavanderia ? 'Peça de roupa' : 'Nome do produto'}</label>
+      <input id="f-nome" type="text" value="${esc(nome)}" placeholder="${ehLavanderia ? 'Ex.: Lençol, Calça' : ''}" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;margin-bottom:12px;font-size:14px">
+      ${mostrarUnidade ? `<label style="font-size:12.5px;color:var(--muted);display:block;margin-bottom:4px">Unidade (ex: un, cx, kg)</label>
+      <input id="f-unidade" type="text" value="${esc(unidade)}" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;margin-bottom:12px;font-size:14px">` : ''}
       ${mostrarLote ? `<label style="font-size:12.5px;color:var(--muted);display:block;margin-bottom:4px">Lote</label>
       <input id="f-lote" type="text" placeholder="Opcional" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;margin-bottom:12px;font-size:14px">` : ''}
       ${mostrarValidade ? `<label style="font-size:12.5px;color:var(--muted);display:block;margin-bottom:4px">Validade (se tiver — não vem no código, precisa digitar)</label>
       <input id="f-validade" type="date" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;margin-bottom:12px;font-size:14px">` : ''}
       <label style="font-size:12.5px;color:var(--muted);display:block;margin-bottom:4px">Quantidade</label>
       <input id="f-qtd" type="number" min="1" value="1" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;margin-bottom:14px;font-size:14px">
-      ${mostrarMorador ? `<label style="font-size:12.5px;color:var(--muted);display:block;margin-bottom:4px">Morador${moradorObrigatorio ? '' : ' (opcional)'}</label>
+      ${mostrarMorador ? `<label style="font-size:12.5px;color:var(--muted);display:block;margin-bottom:4px">Morador${ehLavanderia ? '' : ' (opcional)'}</label>
       <select id="f-morador" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;margin-bottom:14px;font-size:14px">
         <option value="">Carregando moradores...</option>
       </select>` : ''}
-      ${ehMedicamentos ? '' : `<div style="display:flex;gap:10px;margin-bottom:14px">
+      <div style="display:flex;gap:10px;margin-bottom:14px">
         <button id="f-entrada" class="aba ativa" style="flex:1" type="button">${ehLavanderia ? '📤 Enviada p/ lavar' : '📥 Entrada'}</button>
         <button id="f-saida" class="aba" style="flex:1" type="button">${ehLavanderia ? '📥 Devolvida (limpa)' : '📤 Saída'}</button>
-      </div>`}
+      </div>
       <button id="f-salvar" style="width:100%;background:${s.cor};color:#fff;border:none;border-radius:14px;padding:14px;font-size:15px;font-weight:700">Salvar</button>
       <div id="f-msg" style="text-align:center;font-size:12.5px;color:var(--muted);margin-top:10px"></div>
     `;
@@ -543,28 +535,6 @@
         handled_by: f ? f.nome : ''
       });
       location.href = LAVANDERIA_PAINEL_URL + '?' + usp.toString();
-      return;
-    }
-    if(setorChave === 'farmacia-medicamentos'){
-      const moradorEl = document.getElementById('f-morador');
-      const morador = moradorEl ? moradorEl.value : '';
-      if(!morador){ msg.textContent = 'Escolha o morador (residente).'; return; }
-      const doseEl = document.getElementById('f-dose');
-      const unidadeEl = document.getElementById('f-unidade');
-      const f = funcionarioAtual();
-      msg.textContent = 'Abrindo o painel de Medicamentos...';
-      // Confirmado direto no código-fonte real (inspecionado pelo usuário): action="entrada"
-      // (não "mov") e a quantidade é "quantity_in" (não "quantity").
-      const usp = new URLSearchParams({
-        action: 'entrada',
-        resident: morador,
-        medication: nome,
-        dose: doseEl ? doseEl.value.trim() : '',
-        unit: unidadeEl ? unidadeEl.value.trim() : '',
-        quantity_in: String(qtd),
-        updated_by: f ? f.nome : ''
-      });
-      location.href = FARMACIA_MEDICAMENTOS_URL + '?' + usp.toString();
       return;
     }
     if(setorChave === 'cozinha' || setorChave === 'farmacia'){
