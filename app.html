@@ -128,6 +128,10 @@
   .sb-link:active{background:#f4f7f7}
   .sb-link.ativo{background:var(--cor-bg,#e8f4f4);color:var(--teal-esc);border-left-color:var(--teal)}
   .sb-sep{margin:10px 18px;border-top:1px solid var(--borda)}
+  .sb-sub{display:flex;align-items:center;gap:9px;padding:8px 18px 8px 40px;color:var(--muted);font-size:12.5px;font-weight:600;border-left:3px solid transparent}
+  .sb-sub .ico{font-size:14px;width:16px;text-align:center;flex-shrink:0}
+  .sb-sub:active{background:#f4f7f7}
+  .sb-sub.ativo{background:var(--cor-bg,#e8f4f4);color:var(--teal-esc);border-left-color:var(--teal)}
   #main-content{flex:1;min-width:0}
   #hamburger{display:none;position:fixed;top:14px;left:14px;z-index:40;width:42px;height:42px;border-radius:12px;border:none;background:rgba(0,0,0,.35);color:#fff;font-size:19px;align-items:center;justify-content:center}
   #sb-overlay{display:none}
@@ -147,10 +151,15 @@
     <div class="sb-logo">🌳 Village Viver Bem</div>
     <a class="sb-link" data-hash="inicio" href="#inicio"><span class="ico">🏠</span>Início</a>
     <a class="sb-link" data-hash="farmacia" href="#farmacia"><span class="ico">💊</span>Farmácia</a>
+    <a class="sb-sub" data-hash="leitor-farmacia" href="#leitor-farmacia"><span class="ico">📷</span>Leitor rápido</a>
     <a class="sb-link" data-hash="cozinha" href="#cozinha"><span class="ico">🍳</span>Cozinha</a>
+    <a class="sb-sub" data-hash="leitor-cozinha" href="#leitor-cozinha"><span class="ico">📷</span>Leitor rápido</a>
     <a class="sb-link" data-hash="lavanderia" href="#lavanderia"><span class="ico">🧺</span>Rouparia &amp; Lavanderia</a>
+    <a class="sb-sub" data-hash="leitor-lavanderia" href="#leitor-lavanderia"><span class="ico">📷</span>Leitor rápido</a>
     <a class="sb-link" data-hash="secretaria" href="#secretaria"><span class="ico">📋</span>Secretaria</a>
+    <a class="sb-sub" data-hash="leitor-secretaria" href="#leitor-secretaria"><span class="ico">📷</span>Leitor rápido</a>
     <a class="sb-link" data-hash="enfermagem" href="#enfermagem"><span class="ico">🩺</span>Enfermagem</a>
+    <a class="sb-sub" data-hash="leitor-enfermagem" href="#leitor-enfermagem"><span class="ico">📷</span>Leitor rápido</a>
     <div class="sb-sep"></div>
     <a class="sb-link" data-hash="moradores" href="#moradores"><span class="ico">🧑‍🦳</span>Moradores</a>
     <a class="sb-link" data-hash="funcionarios" href="#funcionarios"><span class="ico">🧑‍⚕️</span>Equipe</a>
@@ -200,15 +209,15 @@
     const abrir = forcar !== undefined ? forcar : !layout.classList.contains('sb-aberta');
     layout.classList.toggle('sb-aberta', abrir);
   }
-  document.querySelectorAll('#sidebar .sb-link[data-hash]').forEach(a=>{
+  document.querySelectorAll('#sidebar [data-hash]').forEach(a=>{
     a.addEventListener('click', ()=> toggleSidebar(false));
   });
   function atualizarSidebarAtiva(hashAtual){
     let grupo = hashAtual;
-    if(hashAtual.indexOf('morador') === 0 || ['registrar-agua-','registrar-fralda-','registrar-higiene-','registrar-decubito-','registrar-alimentacao-','anotacao-','vitais-','evolucao-','katz-','editar-katz-'].some(p=>hashAtual.indexOf(p)===0)) grupo = 'moradores';
+    if(hashAtual.indexOf('leitor-') === 0){ /* mantém o hash completo, casa com o sub-item */ }
+    else if(hashAtual.indexOf('morador') === 0 || ['registrar-agua-','registrar-fralda-','registrar-higiene-','registrar-decubito-','registrar-alimentacao-','anotacao-','vitais-','evolucao-','katz-','editar-katz-'].some(p=>hashAtual.indexOf(p)===0)) grupo = 'moradores';
     else if(hashAtual.indexOf('funcionarios') === 0) grupo = 'funcionarios';
-    else if(hashAtual.indexOf('leitor-') === 0) grupo = hashAtual.slice(7);
-    document.querySelectorAll('#sidebar .sb-link[data-hash]').forEach(a=>{
+    document.querySelectorAll('#sidebar [data-hash]').forEach(a=>{
       a.classList.toggle('ativo', a.dataset.hash === grupo);
     });
   }
