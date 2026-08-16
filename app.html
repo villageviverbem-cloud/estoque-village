@@ -152,6 +152,7 @@
     <a class="sb-link" data-hash="inicio" href="#inicio"><span class="ico">🏠</span>Início</a>
     <a class="sb-link" data-hash="farmacia" href="#farmacia"><span class="ico">💊</span>Farmácia</a>
     <a class="sb-sub" data-hash="leitor-farmacia" href="#leitor-farmacia"><span class="ico">📷</span>Leitor rápido</a>
+    <a class="sb-sub" data-hash="medicamentos" id="sb-medicamentos" href="#"><span class="ico">💊</span>Medicamentos</a>
     <a class="sb-link" data-hash="cozinha" href="#cozinha"><span class="ico">🍳</span>Cozinha</a>
     <a class="sb-sub" data-hash="leitor-cozinha" href="#leitor-cozinha"><span class="ico">📷</span>Leitor rápido</a>
     <a class="sb-link" data-hash="lavanderia" href="#lavanderia"><span class="ico">🧺</span>Rouparia &amp; Lavanderia</a>
@@ -204,6 +205,7 @@
 
   // ---------- BARRA LATERAL ----------
   document.getElementById('sb-financeiro').href = APP_FINANCEIRO;
+  document.getElementById('sb-medicamentos').href = FARMACIA_MEDICAMENTOS_URL;
   function toggleSidebar(forcar){
     const layout = document.getElementById('layout');
     const abrir = forcar !== undefined ? forcar : !layout.classList.contains('sb-aberta');
@@ -374,6 +376,12 @@
           <div class="txt"><div class="nome">Moradores</div><div class="desc">Ver e cadastrar residentes</div></div>
           <div class="seta" style="color:${s.cor}">→</div>
         </a>` : '';
+    const opMedicamentos = chave === 'farmacia' ? `
+        <a class="opcao" href="${FARMACIA_MEDICAMENTOS_URL}">
+          <div class="ico" style="background:${s.corBg};color:${s.cor}">💊</div>
+          <div class="txt"><div class="nome">Medicamentos por residente</div><div class="desc">Prescrições, estoque de cada remédio e leitor de código de barras</div></div>
+          <div class="seta" style="color:${s.cor}">→</div>
+        </a>` : '';
     app.innerHTML = `
       <div class="topo" style="background:linear-gradient(120deg,${s.grad[0]},${s.grad[1]})">
         <button class="voltar" onclick="voltarParaIlpi()">← Voltar</button>
@@ -397,6 +405,7 @@
           <div class="txt"><div class="nome">Cadastrar produto novo</div><div class="desc">Registrar um item que ainda não existe</div></div>
           <div class="seta" style="color:${s.cor}">→</div>
         </a>
+        ${opMedicamentos}
         ${opMoradores}
         <a class="opcao" href="#estoque">
           <div class="ico" style="background:#eaf7f0;color:#2f9e6f">📊</div>
