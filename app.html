@@ -204,8 +204,8 @@
   }
 
   // ---------- BARRA LATERAL ----------
-  document.getElementById('sb-financeiro').href = APP_FINANCEIRO;
-  document.getElementById('sb-medicamentos').href = FARMACIA_MEDICAMENTOS_URL;
+  document.getElementById('sb-financeiro').addEventListener('click', function(e){ e.preventDefault(); irExterno('financeiro', APP_FINANCEIRO); });
+  document.getElementById('sb-medicamentos').addEventListener('click', function(e){ e.preventDefault(); irExterno('farmacia', FARMACIA_MEDICAMENTOS_URL); });
   function toggleSidebar(forcar){
     const layout = document.getElementById('layout');
     const abrir = forcar !== undefined ? forcar : !layout.classList.contains('sb-aberta');
@@ -357,7 +357,7 @@
           <div class="seta">→</div><div class="ico" style="background:#eaf7f0;color:#2f9e6f">📊</div>
           <div class="nome">Ver Estoque Geral</div><div class="desc">Acompanhar tudo por setor</div>
         </a>
-        <a class="pasta destaque" href="${APP_FINANCEIRO}" style="background:linear-gradient(120deg,#2f9e6f,#1a6b4a)">
+        <a class="pasta destaque" href="#" onclick="irExterno('financeiro', APP_FINANCEIRO); return false;" style="background:linear-gradient(120deg,#2f9e6f,#1a6b4a)">
           <div class="seta">→</div><div class="ico">💰</div>
           <div class="nome">Financeiro (DRE)</div>
           <div class="desc">Dashboard, DRE, folha de pagamento, contas a pagar e mensalidades</div>
@@ -913,6 +913,68 @@
     return true;
   }
 
+  // ---------- ACESSO POR CARGO ----------
+  // Cada cargo só acessa o próprio setor (+ Moradores, que fica liberado pra
+  // qualquer funcionário logado). "gestao" e admin da Equipe acessam tudo.
+  const ACESSO_SETOR = {
+    farmacia: ['farmacia', 'enfermagem', 'gestao'],
+    cozinha: ['cozinha', 'gestao'],
+    lavanderia: ['lavanderia', 'gestao'],
+    secretaria: ['secretaria', 'gestao'],
+    enfermagem: ['enfermagem', 'gestao'],
+    financeiro: ['gestao']
+  };
+  function temAcessoSetor(chave){
+    const f = funcionarioAtual();
+    if(!f) return false;
+    if(f.admin) return true;
+    const permitidos = ACESSO_SETOR[chave];
+    if(!permitidos) return true;
+    return permitidos.indexOf(f.papel) !== -1;
+  }
+  function telaSemAcesso(chave, f){
+    const nomeSetor = (SETORES[chave] && SETORES[chave].nome) || (chave === 'financeiro' ? 'Financeiro' : chave);
+    app.innerHTML = `
+      <div class="topo" style="background:linear-gradient(120deg,#c0392b,#922b21)">
+        <button class="voltar" onclick="voltarParaIlpi()">← Voltar</button>
+        <h1>🔒 Sem permissão</h1>
+        <p>${esc(f.nome)}, seu cargo não tem acesso a ${esc(nomeSetor)}</p>
+      </div>
+      <div class="wrap" style="text-align:center;padding-top:20px">
+        <div style="font-size:14px;color:var(--muted);margin-bottom:16px">Se isso estiver errado, peça pra um administrador ajustar seu cargo na tela Equipe.</div>
+        <a href="#funcionarios?v=${encodeURIComponent(chave)}" style="color:#1a5276;text-decoration:underline;font-size:14px">Trocar de funcionário</a>
+      </div>
+    `;
+  }
+  function garantirAcessoSetor(chave){
+    const f = funcionarioAtual();
+    if(!f){
+      location.hash = 'funcionarios?v=' + encodeURIComponent(chave);
+      return false;
+    }
+    if(!temAcessoSetor(chave)){
+      telaSemAcesso(chave, f);
+      return false;
+    }
+    return true;
+  }
+  // Pra continuar pro link externo certo depois de logar (ver 'externo-' no roteador).
+  const EXTERNOS = { farmacia: FARMACIA_MEDICAMENTOS_URL, financeiro: APP_FINANCEIRO };
+  // Pra links externos (Financeiro, Farmácia-Medicamentos) que não passam pelo
+  // roteador de hash do app — mesma checagem, mas navega pra fora se liberado.
+  function irExterno(chave, url){
+    const f = funcionarioAtual();
+    if(!f){
+      location.hash = 'funcionarios?v=' + encodeURIComponent('externo-' + chave);
+      return;
+    }
+    if(!temAcessoSetor(chave)){
+      telaSemAcesso(chave, f);
+      return;
+    }
+    location.href = url;
+  }
+
   // Deixa uma <div> clicável também navegável/ativável por teclado (Tab + Enter/Espaço),
   // já que ela substitui um <a> que teria isso de graça.
   function tornarClicavel(el, fn){
@@ -1051,11 +1113,11 @@
     msg.textContent = 'Verificando...';
     try{
       const hash = await sha256Hex(pinDigitado);
-      const rows = await api('funcionarios?select=id,nome,pin_hash,admin&id=eq.'+encodeURIComponent(alvo.id));
+      const rows = await api('funcionarios?select=id,nome,pin_hash,admin,papel&id=eq.'+encodeURIComponent(alvo.id));
       if(sessao !== pinSessao || token !== viewToken) return;
       const f = rows[0];
       if(f && f.pin_hash === hash){
-        setFuncionarioAtual({id: f.id, nome: f.nome, admin: !!f.admin});
+        setFuncionarioAtual({id: f.id, nome: f.nome, admin: !!f.admin, papel: f.papel || 'cuidadora'});
         irPara(voltar || 'funcionarios');
       }else{
         msg.textContent = 'PIN incorreto, tenta de novo.';
@@ -1080,8 +1142,18 @@
       <div class="wrap">
         <label style="font-size:12.5px;color:var(--muted);display:block;margin:10px 0 4px">Nome</label>
         <input id="nf-nome" type="text" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">
-        <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">Cargo</label>
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">Cargo (título, texto livre)</label>
         <input id="nf-cargo" type="text" placeholder="ex: Técnica de Enfermagem" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">Acesso (o que essa pessoa pode abrir no app)</label>
+        <select id="nf-papel" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">
+          <option value="cuidadora">Cuidadora — só Moradores</option>
+          <option value="farmacia">Farmácia</option>
+          <option value="cozinha">Cozinha</option>
+          <option value="lavanderia">Lavanderia</option>
+          <option value="secretaria">Secretaria</option>
+          <option value="enfermagem">Enfermagem — Moradores, Enfermagem e Farmácia</option>
+          <option value="gestao">Gestão — acesso total, incluindo Financeiro</option>
+        </select>
         <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">PIN (4 números)</label>
         <input id="nf-pin" type="password" inputmode="numeric" maxlength="4" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px;letter-spacing:8px">
         <label style="display:flex;align-items:center;gap:8px;margin-top:14px;font-size:13.5px;color:var(--muted)">
@@ -1101,11 +1173,12 @@
     const cargo = document.getElementById('nf-cargo').value.trim();
     const pin = document.getElementById('nf-pin').value.trim();
     const admin = document.getElementById('nf-admin').checked;
+    const papel = document.getElementById('nf-papel').value;
     if(!nome || !/^\d{4}$/.test(pin)){ msg.textContent = 'Preencha o nome e um PIN de exatamente 4 números.'; return; }
     msg.textContent = 'Salvando...';
     try{
       const pin_hash = await sha256Hex(pin);
-      await apiWrite('funcionarios', 'POST', {nome, cargo, pin_hash, ativo: true, admin});
+      await apiWrite('funcionarios', 'POST', {nome, cargo, pin_hash, ativo: true, admin, papel});
       location.hash = 'funcionarios';
     }catch(e){
       msg.textContent = '⚠️ Erro ao salvar: ' + esc(e.message) + '. Se a tabela "funcionarios" ainda não existe, rode o SQL que te mandei.';
@@ -1130,15 +1203,27 @@
     const token = viewToken;
     const el = document.getElementById('fe-area');
     try{
-      const rows = await api('funcionarios?select=id,nome,cargo,admin,ativo&id=eq.'+encodeURIComponent(id));
+      const rows = await api('funcionarios?select=id,nome,cargo,admin,ativo,papel&id=eq.'+encodeURIComponent(id));
       if(token !== viewToken) return;
       const f = rows[0];
       if(!f){ el.innerHTML = '⚠️ Funcionário não encontrado.'; return; }
+      const papelAtual = f.papel || 'cuidadora';
+      const opcoesPapel = [
+        ['cuidadora','Cuidadora — só Moradores'],
+        ['farmacia','Farmácia'],
+        ['cozinha','Cozinha'],
+        ['lavanderia','Lavanderia'],
+        ['secretaria','Secretaria'],
+        ['enfermagem','Enfermagem — Moradores, Enfermagem e Farmácia'],
+        ['gestao','Gestão — acesso total, incluindo Financeiro']
+      ].map(function(o){ return '<option value="'+o[0]+'"'+(o[0]===papelAtual?' selected':'')+'>'+o[1]+'</option>'; }).join('');
       el.innerHTML = `
         <label style="font-size:12.5px;color:var(--muted);display:block;margin:10px 0 4px">Nome</label>
         <input id="fe-nome" type="text" value="${esc(f.nome)}" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">
-        <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">Cargo</label>
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">Cargo (título, texto livre)</label>
         <input id="fe-cargo" type="text" value="${esc(f.cargo||'')}" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">Acesso (o que essa pessoa pode abrir no app)</label>
+        <select id="fe-papel" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">${opcoesPapel}</select>
         <label style="display:flex;align-items:center;gap:8px;margin-top:14px;font-size:13.5px;color:var(--muted)">
           <input id="fe-admin" type="checkbox" ${f.admin?'checked':''} style="width:18px;height:18px">
           Administrador (pode editar/excluir funcionários e resetar PIN)
@@ -1167,16 +1252,17 @@
     const cargo = document.getElementById('fe-cargo').value.trim();
     const admin = document.getElementById('fe-admin').checked;
     const ativo = document.getElementById('fe-ativo').checked;
+    const papel = document.getElementById('fe-papel').value;
     const pin = document.getElementById('fe-pin').value.trim();
     if(!nome){ msg.textContent = 'Preencha o nome.'; return; }
     if(pin && !/^\d{4}$/.test(pin)){ msg.textContent = 'O PIN novo precisa ter exatamente 4 números (ou deixe em branco pra manter o atual).'; return; }
     msg.textContent = 'Salvando...';
     try{
-      const corpo = {nome, cargo, admin, ativo};
+      const corpo = {nome, cargo, admin, ativo, papel};
       if(pin){ corpo.pin_hash = await sha256Hex(pin); }
       await apiWrite('funcionarios?id=eq.'+encodeURIComponent(id), 'PATCH', corpo);
       const atual = funcionarioAtual();
-      if(atual && atual.id === id){ setFuncionarioAtual({id, nome, admin}); }
+      if(atual && atual.id === id){ setFuncionarioAtual({id, nome, admin, papel}); }
       location.hash = 'funcionarios';
     }catch(e){
       msg.textContent = '⚠️ Erro ao salvar: ' + esc(e.message);
@@ -1851,6 +1937,7 @@
     else if(hash === 'estoque') telaEstoque();
     else if(hash === 'moradores') telaMoradores();
     else if((m = apósPrefixo(hash, 'leitor-')) !== null) telaLeitor(m);
+    else if((m = apósPrefixo(hash, 'externo-')) !== null) { if(EXTERNOS[m]) irExterno(m, EXTERNOS[m]); else telaInicio(); }
     else if(hash === 'funcionarios') telaFuncionarios();
     else if(hash === 'funcionarios-novo') telaFuncionarioNovo();
     else if((m = apósPrefixo(hash, 'funcionarios-editar-')) !== null) telaFuncionarioEditar(m);
@@ -1865,7 +1952,7 @@
     else if((m = apósPrefixo(hash, 'evolucao-')) !== null) telaEvolucao(m);
     else if((m = apósPrefixo(hash, 'katz-')) !== null) telaKatz(m);
     else if((m = apósPrefixo(hash, 'morador-')) !== null) telaMoradorFicha(m);
-    else if(SETORES[hash]) telaSetor(hash);
+    else if(SETORES[hash]) { if(garantirAcessoSetor(hash)) telaSetor(hash); }
     else telaInicio();
     atualizarSidebarAtiva(hash);
     window.scrollTo(0,0);
