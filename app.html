@@ -152,6 +152,7 @@
     <a class="sb-link" data-hash="inicio" href="#inicio"><span class="ico">🏠</span>Início</a>
     <a class="sb-link" data-hash="farmacia" href="#farmacia"><span class="ico">💊</span>Farmácia</a>
     <a class="sb-sub" data-hash="leitor-farmacia" href="#leitor-farmacia"><span class="ico">📷</span>Leitor rápido</a>
+    <a class="sb-sub" data-hash="medicamentos" id="sb-medicamentos" href="#"><span class="ico">💊</span>Medicamentos</a>
     <a class="sb-link" data-hash="cozinha" href="#cozinha"><span class="ico">🍳</span>Cozinha</a>
     <a class="sb-sub" data-hash="leitor-cozinha" href="#leitor-cozinha"><span class="ico">📷</span>Leitor rápido</a>
     <a class="sb-link" data-hash="lavanderia" href="#lavanderia"><span class="ico">🧺</span>Rouparia &amp; Lavanderia</a>
@@ -204,6 +205,7 @@
 
   // ---------- BARRA LATERAL ----------
   document.getElementById('sb-financeiro').href = APP_FINANCEIRO;
+  document.getElementById('sb-medicamentos').href = FARMACIA_MEDICAMENTOS_URL;
   function toggleSidebar(forcar){
     const layout = document.getElementById('layout');
     const abrir = forcar !== undefined ? forcar : !layout.classList.contains('sb-aberta');
@@ -374,6 +376,12 @@
           <div class="txt"><div class="nome">Moradores</div><div class="desc">Ver e cadastrar residentes</div></div>
           <div class="seta" style="color:${s.cor}">→</div>
         </a>` : '';
+    const opMedicamentos = chave === 'farmacia' ? `
+        <a class="opcao" href="${FARMACIA_MEDICAMENTOS_URL}">
+          <div class="ico" style="background:${s.corBg};color:${s.cor}">💊</div>
+          <div class="txt"><div class="nome">Medicamentos por residente</div><div class="desc">Prescrições, estoque de cada remédio e leitor de código de barras</div></div>
+          <div class="seta" style="color:${s.cor}">→</div>
+        </a>` : '';
     app.innerHTML = `
       <div class="topo" style="background:linear-gradient(120deg,${s.grad[0]},${s.grad[1]})">
         <button class="voltar" onclick="voltarParaIlpi()">← Voltar</button>
@@ -397,6 +405,7 @@
           <div class="txt"><div class="nome">Cadastrar produto novo</div><div class="desc">Registrar um item que ainda não existe</div></div>
           <div class="seta" style="color:${s.cor}">→</div>
         </a>
+        ${opMedicamentos}
         ${opMoradores}
         <a class="opcao" href="#estoque">
           <div class="ico" style="background:#eaf7f0;color:#2f9e6f">📊</div>
@@ -895,6 +904,15 @@
     return true;
   }
 
+  function exigirAdmin(){
+    const f = funcionarioAtual();
+    if(!f || !f.admin){
+      location.hash = 'funcionarios';
+      return false;
+    }
+    return true;
+  }
+
   // Deixa uma <div> clicável também navegável/ativável por teclado (Tab + Enter/Espaço),
   // já que ela substitui um <a> que teria isso de graça.
   function tornarClicavel(el, fn){
@@ -941,22 +959,30 @@
     const token = viewToken;
     const el = document.getElementById('func-area');
     try{
-      const lista = await api('funcionarios?select=id,nome,cargo&ativo=eq.true&order=nome');
+      const lista = await api('funcionarios?select=id,nome,cargo,admin&ativo=eq.true&order=nome');
       if(token !== viewToken) return;
       if(!lista.length){
         el.innerHTML = '<div class="estado">Nenhum funcionário cadastrado ainda.<br>Toque em "Cadastrar funcionário" abaixo.</div>';
         return;
       }
+      const souAdmin = !!(funcionarioAtual() && funcionarioAtual().admin);
       el.innerHTML = lista.map(f=>{
         const fid = esc(f.id);
-        return `<div class="morador js-func" data-id="${fid}" data-nome="${esc(f.nome)}" style="cursor:pointer">
-          <div class="av">${esc(iniciais(f.nome))}</div>
-          <div style="flex:1"><div class="nome">${esc(f.nome)}</div><div class="quarto">${esc(f.cargo||'')}</div></div>
-          <div class="seta" style="color:var(--teal)">→</div>
+        const editBtn = souAdmin ? `<a href="#funcionarios-editar-${fid}" class="js-func-editar" data-id="${fid}" style="padding:8px 10px;color:var(--muted)" title="Editar / acesso">✏️</a>` : '';
+        return `<div class="morador" data-id="${fid}" style="display:flex;align-items:center">
+          <div class="js-func" data-id="${fid}" data-nome="${esc(f.nome)}" style="cursor:pointer;display:flex;align-items:center;flex:1;gap:12px">
+            <div class="av">${esc(iniciais(f.nome))}</div>
+            <div style="flex:1"><div class="nome">${esc(f.nome)}${f.admin ? ' <span style="font-size:10.5px;color:#7a5fb0;font-weight:700">· ADMIN</span>' : ''}</div><div class="quarto">${esc(f.cargo||'')}</div></div>
+            <div class="seta" style="color:var(--teal)">→</div>
+          </div>
+          ${editBtn}
         </div>`;
       }).join('');
       el.querySelectorAll('.js-func').forEach(div=>{
         tornarClicavel(div, ()=>abrirPinFuncionario(div.dataset.id, div.dataset.nome));
+      });
+      el.querySelectorAll('.js-func-editar').forEach(a=>{
+        a.addEventListener('click', e=>e.stopPropagation());
       });
     }catch(e){
       if(token !== viewToken) return;
@@ -1025,11 +1051,11 @@
     msg.textContent = 'Verificando...';
     try{
       const hash = await sha256Hex(pinDigitado);
-      const rows = await api('funcionarios?select=id,nome,pin_hash&id=eq.'+encodeURIComponent(alvo.id));
+      const rows = await api('funcionarios?select=id,nome,pin_hash,admin&id=eq.'+encodeURIComponent(alvo.id));
       if(sessao !== pinSessao || token !== viewToken) return;
       const f = rows[0];
       if(f && f.pin_hash === hash){
-        setFuncionarioAtual({id: f.id, nome: f.nome});
+        setFuncionarioAtual({id: f.id, nome: f.nome, admin: !!f.admin});
         irPara(voltar || 'funcionarios');
       }else{
         msg.textContent = 'PIN incorreto, tenta de novo.';
@@ -1058,6 +1084,10 @@
         <input id="nf-cargo" type="text" placeholder="ex: Técnica de Enfermagem" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">
         <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">PIN (4 números)</label>
         <input id="nf-pin" type="password" inputmode="numeric" maxlength="4" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px;letter-spacing:8px">
+        <label style="display:flex;align-items:center;gap:8px;margin-top:14px;font-size:13.5px;color:var(--muted)">
+          <input id="nf-admin" type="checkbox" style="width:18px;height:18px">
+          Administrador (pode editar/excluir funcionários e resetar PIN)
+        </label>
         <button id="nf-salvar" style="width:100%;background:#7a5fb0;color:#fff;border:none;border-radius:14px;padding:14px;font-size:15px;font-weight:700;margin-top:16px">Cadastrar</button>
         <div id="nf-msg" style="text-align:center;font-size:12.5px;color:var(--muted);margin-top:10px"></div>
       </div>
@@ -1070,14 +1100,100 @@
     const nome = document.getElementById('nf-nome').value.trim();
     const cargo = document.getElementById('nf-cargo').value.trim();
     const pin = document.getElementById('nf-pin').value.trim();
+    const admin = document.getElementById('nf-admin').checked;
     if(!nome || !/^\d{4}$/.test(pin)){ msg.textContent = 'Preencha o nome e um PIN de exatamente 4 números.'; return; }
     msg.textContent = 'Salvando...';
     try{
       const pin_hash = await sha256Hex(pin);
-      await apiWrite('funcionarios', 'POST', {nome, cargo, pin_hash, ativo: true});
+      await apiWrite('funcionarios', 'POST', {nome, cargo, pin_hash, ativo: true, admin});
       location.hash = 'funcionarios';
     }catch(e){
       msg.textContent = '⚠️ Erro ao salvar: ' + esc(e.message) + '. Se a tabela "funcionarios" ainda não existe, rode o SQL que te mandei.';
+    }
+  }
+
+  function telaFuncionarioEditar(id){
+    if(!exigirAdmin()) return;
+    app.innerHTML = `
+      <div class="topo" style="background:linear-gradient(120deg,#9070c0,#7a5fb0)">
+        <button class="voltar" onclick="location.hash='funcionarios'">← Voltar</button>
+        <h1>✏️ Editar funcionário</h1>
+        <p>Dados, acesso e PIN</p>
+      </div>
+      <div id="fe-area" class="wrap"><div class="estado"><div class="spin"></div>Carregando...</div></div>
+      <div class="rodape">Village Viver Bem · Residencial Care · Equipe v1</div>
+    `;
+    carregarFuncionarioEditar(id);
+  }
+
+  async function carregarFuncionarioEditar(id){
+    const token = viewToken;
+    const el = document.getElementById('fe-area');
+    try{
+      const rows = await api('funcionarios?select=id,nome,cargo,admin,ativo&id=eq.'+encodeURIComponent(id));
+      if(token !== viewToken) return;
+      const f = rows[0];
+      if(!f){ el.innerHTML = '⚠️ Funcionário não encontrado.'; return; }
+      el.innerHTML = `
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:10px 0 4px">Nome</label>
+        <input id="fe-nome" type="text" value="${esc(f.nome)}" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">Cargo</label>
+        <input id="fe-cargo" type="text" value="${esc(f.cargo||'')}" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">
+        <label style="display:flex;align-items:center;gap:8px;margin-top:14px;font-size:13.5px;color:var(--muted)">
+          <input id="fe-admin" type="checkbox" ${f.admin?'checked':''} style="width:18px;height:18px">
+          Administrador (pode editar/excluir funcionários e resetar PIN)
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13.5px;color:var(--muted)">
+          <input id="fe-ativo" type="checkbox" ${f.ativo!==false?'checked':''} style="width:18px;height:18px">
+          Ativo (desmarque se essa pessoa saiu da empresa — trava o login sem apagar o histórico dela)
+        </label>
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:16px 0 4px">Resetar PIN (opcional)</label>
+        <input id="fe-pin" type="password" inputmode="numeric" maxlength="4" placeholder="Deixe em branco pra manter o PIN atual" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px;letter-spacing:8px">
+        <button id="fe-salvar" style="width:100%;background:#7a5fb0;color:#fff;border:none;border-radius:14px;padding:14px;font-size:15px;font-weight:700;margin-top:18px">💾 Salvar</button>
+        <button id="fe-excluir" style="width:100%;background:#fff;color:#c0392b;border:1px solid #f2b8b0;border-radius:14px;padding:14px;font-size:15px;font-weight:700;margin-top:10px">🗑️ Excluir permanentemente</button>
+        <div id="fe-msg" style="text-align:center;font-size:12.5px;color:var(--muted);margin-top:10px"></div>
+      `;
+      document.getElementById('fe-salvar').addEventListener('click', ()=>salvarFuncionarioEditar(id));
+      document.getElementById('fe-excluir').addEventListener('click', ()=>excluirFuncionario(id, f.nome));
+    }catch(e){
+      if(token !== viewToken) return;
+      el.innerHTML = '⚠️ Não consegui carregar. <br><small>('+esc(e.message)+')</small>';
+    }
+  }
+
+  async function salvarFuncionarioEditar(id){
+    const msg = document.getElementById('fe-msg');
+    const nome = document.getElementById('fe-nome').value.trim();
+    const cargo = document.getElementById('fe-cargo').value.trim();
+    const admin = document.getElementById('fe-admin').checked;
+    const ativo = document.getElementById('fe-ativo').checked;
+    const pin = document.getElementById('fe-pin').value.trim();
+    if(!nome){ msg.textContent = 'Preencha o nome.'; return; }
+    if(pin && !/^\d{4}$/.test(pin)){ msg.textContent = 'O PIN novo precisa ter exatamente 4 números (ou deixe em branco pra manter o atual).'; return; }
+    msg.textContent = 'Salvando...';
+    try{
+      const corpo = {nome, cargo, admin, ativo};
+      if(pin){ corpo.pin_hash = await sha256Hex(pin); }
+      await apiWrite('funcionarios?id=eq.'+encodeURIComponent(id), 'PATCH', corpo);
+      const atual = funcionarioAtual();
+      if(atual && atual.id === id){ setFuncionarioAtual({id, nome, admin}); }
+      location.hash = 'funcionarios';
+    }catch(e){
+      msg.textContent = '⚠️ Erro ao salvar: ' + esc(e.message);
+    }
+  }
+
+  async function excluirFuncionario(id, nome){
+    if(!confirm('Excluir "'+nome+'" permanentemente? Isso não apaga os registros já feitos por essa pessoa (ficam salvos com o nome dela), mas não pode ser desfeito. Se for só porque a pessoa saiu da empresa, prefira desmarcar "Ativo" e salvar, em vez de excluir.')) return;
+    const msg = document.getElementById('fe-msg');
+    msg.textContent = 'Excluindo...';
+    try{
+      await apiWrite('funcionarios?id=eq.'+encodeURIComponent(id), 'DELETE', {});
+      const atual = funcionarioAtual();
+      if(atual && atual.id === id){ localStorage.removeItem('vv_funcionario'); }
+      location.hash = 'funcionarios';
+    }catch(e){
+      msg.textContent = '⚠️ Erro ao excluir: ' + esc(e.message);
     }
   }
 
@@ -1737,6 +1853,7 @@
     else if((m = apósPrefixo(hash, 'leitor-')) !== null) telaLeitor(m);
     else if(hash === 'funcionarios') telaFuncionarios();
     else if(hash === 'funcionarios-novo') telaFuncionarioNovo();
+    else if((m = apósPrefixo(hash, 'funcionarios-editar-')) !== null) telaFuncionarioEditar(m);
     else if((m = apósPrefixo(hash, 'editar-katz-')) !== null) telaKatz(m, true);
     else if((m = apósPrefixo(hash, 'registrar-agua-')) !== null) telaRegistrarSimples('agua', m);
     else if((m = apósPrefixo(hash, 'registrar-fralda-')) !== null) telaRegistrarSimples('fralda', m);
