@@ -930,7 +930,8 @@
     if(f.admin) return true;
     const permitidos = ACESSO_SETOR[chave];
     if(!permitidos) return true;
-    return permitidos.indexOf(f.papel) !== -1;
+    const papeis = f.papeis || [];
+    return papeis.some(function(p){ return permitidos.indexOf(p) !== -1; });
   }
   function telaSemAcesso(chave, f){
     const nomeSetor = (SETORES[chave] && SETORES[chave].nome) || (chave === 'financeiro' ? 'Financeiro' : chave);
@@ -1113,11 +1114,11 @@
     msg.textContent = 'Verificando...';
     try{
       const hash = await sha256Hex(pinDigitado);
-      const rows = await api('funcionarios?select=id,nome,pin_hash,admin,papel&id=eq.'+encodeURIComponent(alvo.id));
+      const rows = await api('funcionarios?select=id,nome,pin_hash,admin,papeis&id=eq.'+encodeURIComponent(alvo.id));
       if(sessao !== pinSessao || token !== viewToken) return;
       const f = rows[0];
       if(f && f.pin_hash === hash){
-        setFuncionarioAtual({id: f.id, nome: f.nome, admin: !!f.admin, papel: f.papel || 'cuidadora'});
+        setFuncionarioAtual({id: f.id, nome: f.nome, admin: !!f.admin, papeis: (f.papeis && f.papeis.length) ? f.papeis : ['cuidadora']});
         irPara(voltar || 'funcionarios');
       }else{
         msg.textContent = 'PIN incorreto, tenta de novo.';
@@ -1132,6 +1133,27 @@
     }
   }
 
+  const OPCOES_PAPEL = [
+    ['cuidadora','Cuidadora — só Moradores'],
+    ['farmacia','Farmácia'],
+    ['cozinha','Cozinha'],
+    ['lavanderia','Lavanderia'],
+    ['secretaria','Secretaria'],
+    ['enfermagem','Enfermagem — Moradores, Enfermagem e Farmácia'],
+    ['gestao','Gestão — acesso total, incluindo Financeiro']
+  ];
+  function checkboxesPapel(idPrefixo, papeisAtuais){
+    const marcados = papeisAtuais || [];
+    return OPCOES_PAPEL.map(function(o){
+      return '<label style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:13.5px">'
+        + '<input type="checkbox" class="'+idPrefixo+'-papel-item" value="'+o[0]+'" '+(marcados.indexOf(o[0])!==-1?'checked':'')+' style="width:18px;height:18px">'
+        + o[1] + '</label>';
+    }).join('');
+  }
+  function lerPapeisMarcados(idPrefixo){
+    return Array.from(document.querySelectorAll('.'+idPrefixo+'-papel-item:checked')).map(function(i){ return i.value; });
+  }
+
   function telaFuncionarioNovo(){
     app.innerHTML = `
       <div class="topo" style="background:linear-gradient(120deg,#9070c0,#7a5fb0)">
@@ -1144,16 +1166,8 @@
         <input id="nf-nome" type="text" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">
         <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">Cargo (título, texto livre)</label>
         <input id="nf-cargo" type="text" placeholder="ex: Técnica de Enfermagem" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">
-        <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">Acesso (o que essa pessoa pode abrir no app)</label>
-        <select id="nf-papel" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">
-          <option value="cuidadora">Cuidadora — só Moradores</option>
-          <option value="farmacia">Farmácia</option>
-          <option value="cozinha">Cozinha</option>
-          <option value="lavanderia">Lavanderia</option>
-          <option value="secretaria">Secretaria</option>
-          <option value="enfermagem">Enfermagem — Moradores, Enfermagem e Farmácia</option>
-          <option value="gestao">Gestão — acesso total, incluindo Financeiro</option>
-        </select>
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">Acesso (marque um ou mais setores)</label>
+        <div id="nf-papeis" style="border:1px solid var(--borda);border-radius:10px;padding:11px 14px">${checkboxesPapel('nf', ['cuidadora'])}</div>
         <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">PIN (4 números)</label>
         <input id="nf-pin" type="password" inputmode="numeric" maxlength="4" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px;letter-spacing:8px">
         <label style="display:flex;align-items:center;gap:8px;margin-top:14px;font-size:13.5px;color:var(--muted)">
@@ -1173,12 +1187,13 @@
     const cargo = document.getElementById('nf-cargo').value.trim();
     const pin = document.getElementById('nf-pin').value.trim();
     const admin = document.getElementById('nf-admin').checked;
-    const papel = document.getElementById('nf-papel').value;
+    const papeis = lerPapeisMarcados('nf');
     if(!nome || !/^\d{4}$/.test(pin)){ msg.textContent = 'Preencha o nome e um PIN de exatamente 4 números.'; return; }
+    if(!papeis.length){ msg.textContent = 'Marque pelo menos um setor de acesso.'; return; }
     msg.textContent = 'Salvando...';
     try{
       const pin_hash = await sha256Hex(pin);
-      await apiWrite('funcionarios', 'POST', {nome, cargo, pin_hash, ativo: true, admin, papel});
+      await apiWrite('funcionarios', 'POST', {nome, cargo, pin_hash, ativo: true, admin, papeis});
       location.hash = 'funcionarios';
     }catch(e){
       msg.textContent = '⚠️ Erro ao salvar: ' + esc(e.message) + '. Se a tabela "funcionarios" ainda não existe, rode o SQL que te mandei.';
@@ -1203,27 +1218,18 @@
     const token = viewToken;
     const el = document.getElementById('fe-area');
     try{
-      const rows = await api('funcionarios?select=id,nome,cargo,admin,ativo,papel&id=eq.'+encodeURIComponent(id));
+      const rows = await api('funcionarios?select=id,nome,cargo,admin,ativo,papeis&id=eq.'+encodeURIComponent(id));
       if(token !== viewToken) return;
       const f = rows[0];
       if(!f){ el.innerHTML = '⚠️ Funcionário não encontrado.'; return; }
-      const papelAtual = f.papel || 'cuidadora';
-      const opcoesPapel = [
-        ['cuidadora','Cuidadora — só Moradores'],
-        ['farmacia','Farmácia'],
-        ['cozinha','Cozinha'],
-        ['lavanderia','Lavanderia'],
-        ['secretaria','Secretaria'],
-        ['enfermagem','Enfermagem — Moradores, Enfermagem e Farmácia'],
-        ['gestao','Gestão — acesso total, incluindo Financeiro']
-      ].map(function(o){ return '<option value="'+o[0]+'"'+(o[0]===papelAtual?' selected':'')+'>'+o[1]+'</option>'; }).join('');
+      const papeisAtuais = (f.papeis && f.papeis.length) ? f.papeis : ['cuidadora'];
       el.innerHTML = `
         <label style="font-size:12.5px;color:var(--muted);display:block;margin:10px 0 4px">Nome</label>
         <input id="fe-nome" type="text" value="${esc(f.nome)}" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">
         <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">Cargo (título, texto livre)</label>
         <input id="fe-cargo" type="text" value="${esc(f.cargo||'')}" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">
-        <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">Acesso (o que essa pessoa pode abrir no app)</label>
-        <select id="fe-papel" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">${opcoesPapel}</select>
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">Acesso (marque um ou mais setores)</label>
+        <div id="fe-papeis" style="border:1px solid var(--borda);border-radius:10px;padding:11px 14px">${checkboxesPapel('fe', papeisAtuais)}</div>
         <label style="display:flex;align-items:center;gap:8px;margin-top:14px;font-size:13.5px;color:var(--muted)">
           <input id="fe-admin" type="checkbox" ${f.admin?'checked':''} style="width:18px;height:18px">
           Administrador (pode editar/excluir funcionários e resetar PIN)
@@ -1252,17 +1258,18 @@
     const cargo = document.getElementById('fe-cargo').value.trim();
     const admin = document.getElementById('fe-admin').checked;
     const ativo = document.getElementById('fe-ativo').checked;
-    const papel = document.getElementById('fe-papel').value;
+    const papeis = lerPapeisMarcados('fe');
     const pin = document.getElementById('fe-pin').value.trim();
     if(!nome){ msg.textContent = 'Preencha o nome.'; return; }
+    if(!papeis.length){ msg.textContent = 'Marque pelo menos um setor de acesso.'; return; }
     if(pin && !/^\d{4}$/.test(pin)){ msg.textContent = 'O PIN novo precisa ter exatamente 4 números (ou deixe em branco pra manter o atual).'; return; }
     msg.textContent = 'Salvando...';
     try{
-      const corpo = {nome, cargo, admin, ativo, papel};
+      const corpo = {nome, cargo, admin, ativo, papeis};
       if(pin){ corpo.pin_hash = await sha256Hex(pin); }
       await apiWrite('funcionarios?id=eq.'+encodeURIComponent(id), 'PATCH', corpo);
       const atual = funcionarioAtual();
-      if(atual && atual.id === id){ setFuncionarioAtual({id, nome, admin, papel}); }
+      if(atual && atual.id === id){ setFuncionarioAtual({id, nome, admin, papeis}); }
       location.hash = 'funcionarios';
     }catch(e){
       msg.textContent = '⚠️ Erro ao salvar: ' + esc(e.message);
