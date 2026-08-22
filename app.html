@@ -183,7 +183,6 @@
   // ==== Links dos formulários n8n (compartilhados por todos os setores) ====
   const FORM_MOVIMENTACAO = 'https://eduardonoronha9.app.n8n.cloud/form/1f25fe1e-e6dd-4b9a-aa30-9a6313cf085e';
   const FORM_CADASTRO_PRODUTO = 'https://eduardonoronha9.app.n8n.cloud/form/5c0cf483-dcfb-4a6e-8a00-eacde4067546';
-  const FORM_CADASTRO_MORADOR = 'https://eduardonoronha9.app.n8n.cloud/form/5d70ad38-6232-4836-bae7-8828e25994e6';
 
   // ==== App financeiro (DRE, folha, contas a pagar etc.) — sistema próprio, hospedado à parte ====
   const APP_FINANCEIRO = 'https://villageviverbem-cloud.github.io/Village-Financeiro/';
@@ -824,7 +823,7 @@
         <button class="atualizado" onclick="carregarMoradores()">🔄 <span id="quando">Carregando...</span></button>
       </div>
       <div class="acao">
-        <a class="btn-add" href="${FORM_CADASTRO_MORADOR}" target="_blank">
+        <a class="btn-add" href="#morador-novo">
           <div class="ico">➕</div>
           <div><div class="nome">Cadastrar novo morador</div><div class="desc">Registrar um novo residente</div></div>
           <div class="seta">→</div>
@@ -930,7 +929,7 @@
     const token = viewToken;
     const el = document.getElementById('me-area');
     try{
-      const rows = await api('moradores?select=id,nome,quarto,sexo,ativo&id=eq.'+encodeURIComponent(id));
+      const rows = await api('moradores?select=*&id=eq.'+encodeURIComponent(id));
       if(token !== viewToken) return;
       const m = rows[0];
       if(!m){ el.innerHTML = '⚠️ Morador não encontrado.'; return; }
@@ -942,10 +941,32 @@
       el.innerHTML = `
         <label style="font-size:12.5px;color:var(--muted);display:block;margin:10px 0 4px">Nome</label>
         <input id="me-nome" type="text" value="${esc(m.nome||'')}" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">
-        <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">Quarto</label>
-        <input id="me-quarto" type="text" value="${esc(m.quarto||'')}" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">Data de nascimento</label>
+        <input id="me-nascimento" type="date" value="${esc(m.data_nascimento||'')}" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">
         <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">Sexo</label>
         <select id="me-sexo" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">${opcoesSexo}</select>
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">CPF</label>
+        <input id="me-cpf" type="text" value="${esc(m.cpf||'')}" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">RG</label>
+        <input id="me-rg" type="text" value="${esc(m.rg||'')}" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">Quarto</label>
+        <input id="me-quarto" type="text" value="${esc(m.quarto||'')}" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">Data de entrada</label>
+        <input id="me-entrada" type="date" value="${esc(m.data_entrada||'')}" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">Convênio / Responsável</label>
+        <input id="me-convenio" type="text" value="${esc(m.convenio||'')}" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">Contato de família — Nome</label>
+        <input id="me-contato-nome" type="text" value="${esc(m.contato_familia_nome||'')}" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">Contato de família — Telefone</label>
+        <input id="me-contato-tel" type="text" value="${esc(m.contato_familia_telefone||'')}" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">Alergias</label>
+        <textarea id="me-alergias" rows="2" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">${esc(m.alergias||'')}</textarea>
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">Restrições alimentares</label>
+        <textarea id="me-restricoes" rows="2" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">${esc(m.restricoes_alimentares||'')}</textarea>
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">Doenças crônicas / Diagnósticos</label>
+        <textarea id="me-doencas" rows="2" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">${esc(m.doencas_cronicas||'')}</textarea>
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">Observações</label>
+        <textarea id="me-obs" rows="2" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">${esc(m.observacoes||'')}</textarea>
         <label style="display:flex;align-items:center;gap:8px;margin-top:14px;font-size:13.5px;color:var(--muted)">
           <input id="me-ativo" type="checkbox" ${m.ativo!==false?'checked':''} style="width:18px;height:18px">
           Ativo (desmarque pra arquivar — some das listas principais, mas mantém o histórico)
@@ -963,16 +984,99 @@
   async function salvarMoradorEditar(id){
     const msg = document.getElementById('me-msg');
     const nome = document.getElementById('me-nome').value.trim();
-    const quarto = document.getElementById('me-quarto').value.trim();
     const sexo = document.getElementById('me-sexo').value;
     const ativo = document.getElementById('me-ativo').checked;
     if(!nome){ msg.textContent = 'Preencha o nome.'; return; }
+    const val = fieldId => { const v = document.getElementById(fieldId).value.trim(); return v || null; };
     msg.textContent = 'Salvando...';
     try{
-      await apiWrite('moradores?id=eq.'+encodeURIComponent(id), 'PATCH', {nome, quarto: quarto || null, sexo: sexo || null, ativo});
+      await apiWrite('moradores?id=eq.'+encodeURIComponent(id), 'PATCH', {
+        nome, sexo: sexo || null, ativo,
+        quarto: val('me-quarto'), data_nascimento: val('me-nascimento'), cpf: val('me-cpf'), rg: val('me-rg'),
+        data_entrada: val('me-entrada'), convenio: val('me-convenio'),
+        contato_familia_nome: val('me-contato-nome'), contato_familia_telefone: val('me-contato-tel'),
+        alergias: val('me-alergias'), restricoes_alimentares: val('me-restricoes'),
+        doencas_cronicas: val('me-doencas'), observacoes: val('me-obs')
+      });
       location.hash = 'moradores';
     }catch(e){
       msg.textContent = '⚠️ Erro ao salvar: ' + esc(e.message);
+    }
+  }
+
+  function telaMoradorNovo(){
+    if(!exigirFuncionario('morador-novo')) return;
+    app.innerHTML = `
+      <div class="topo" style="background:linear-gradient(120deg,var(--teal),var(--verde))">
+        <button class="voltar" onclick="location.hash='moradores'">← Voltar</button>
+        <h1>➕ Cadastrar morador</h1>
+        <p>Dados de admissão do novo residente</p>
+      </div>
+      ${bannerFuncionario('morador-novo')}
+      <div class="wrap">
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:10px 0 4px">Nome completo</label>
+        <input id="mn-nome" type="text" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">Data de nascimento</label>
+        <input id="mn-nascimento" type="date" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">Sexo</label>
+        <select id="mn-sexo" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">
+          <option value="">— não informado —</option>
+          <option value="Masculino">Masculino</option>
+          <option value="Feminino">Feminino</option>
+        </select>
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">CPF</label>
+        <input id="mn-cpf" type="text" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">RG</label>
+        <input id="mn-rg" type="text" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">Quarto / Leito</label>
+        <input id="mn-quarto" type="text" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">Data de entrada</label>
+        <input id="mn-entrada" type="date" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">Convênio / Responsável</label>
+        <input id="mn-convenio" type="text" placeholder="Ex.: SUS, Prefeitura de..., particular" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">Contato de família — Nome</label>
+        <input id="mn-contato-nome" type="text" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">Contato de família — Telefone</label>
+        <input id="mn-contato-tel" type="text" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">Alergias</label>
+        <textarea id="mn-alergias" rows="2" placeholder="Ex.: nega alergias" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px"></textarea>
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">Restrições alimentares</label>
+        <textarea id="mn-restricoes" rows="2" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px"></textarea>
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">Doenças crônicas / Diagnósticos</label>
+        <textarea id="mn-doencas" rows="2" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px"></textarea>
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">Observações</label>
+        <textarea id="mn-obs" rows="2" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px"></textarea>
+        <button id="mn-salvar" style="width:100%;background:var(--teal);color:#fff;border:none;border-radius:14px;padding:14px;font-size:15px;font-weight:700;margin-top:18px">💾 Cadastrar</button>
+        <div id="mn-msg" style="text-align:center;font-size:12.5px;color:var(--muted);margin-top:10px"></div>
+      </div>
+      <div class="rodape">Village Viver Bem · Residencial Care · Moradores v1</div>
+    `;
+    document.getElementById('mn-salvar').addEventListener('click', salvarMoradorNovo);
+  }
+
+  async function salvarMoradorNovo(){
+    const msg = document.getElementById('mn-msg');
+    const nome = document.getElementById('mn-nome').value.trim();
+    if(!nome){ msg.textContent = 'Preencha o nome completo.'; return; }
+    const f = funcionarioAtual();
+    if(!f){ location.hash = 'funcionarios?v=' + encodeURIComponent('morador-novo'); return; }
+    const val = id => { const v = document.getElementById(id).value.trim(); return v || null; };
+    msg.textContent = 'Salvando...';
+    const btn = document.getElementById('mn-salvar');
+    if(btn) btn.disabled = true;
+    try{
+      await apiWrite('moradores', 'POST', {
+        nome, ativo: true,
+        data_nascimento: val('mn-nascimento'), sexo: val('mn-sexo'), cpf: val('mn-cpf'), rg: val('mn-rg'),
+        quarto: val('mn-quarto'), data_entrada: val('mn-entrada'), convenio: val('mn-convenio'),
+        contato_familia_nome: val('mn-contato-nome'), contato_familia_telefone: val('mn-contato-tel'),
+        alergias: val('mn-alergias'), restricoes_alimentares: val('mn-restricoes'),
+        doencas_cronicas: val('mn-doencas'), observacoes: val('mn-obs')
+      });
+      location.hash = 'moradores';
+    }catch(e){
+      msg.textContent = '⚠️ Erro ao salvar: ' + esc(e.message) + '. Se os campos novos não existirem na tabela, rode o SQL que te mandei.';
+      if(btn) btn.disabled = false;
     }
   }
 
@@ -2363,6 +2467,7 @@
     else if((m = apósPrefixo(hash, 'vitais-')) !== null) telaVitais(m);
     else if((m = apósPrefixo(hash, 'evolucao-')) !== null) telaEvolucao(m);
     else if((m = apósPrefixo(hash, 'katz-')) !== null) telaKatz(m);
+    else if(hash === 'morador-novo') telaMoradorNovo();
     else if((m = apósPrefixo(hash, 'morador-editar-')) !== null) telaMoradorEditar(m);
     else if((m = apósPrefixo(hash, 'medicacoes-')) !== null) telaMedicacoes(m);
     else if((m = apósPrefixo(hash, 'administrar-')) !== null) telaAdministrarMedicamento(m);
