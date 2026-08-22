@@ -220,7 +220,7 @@
   function atualizarSidebarAtiva(hashAtual){
     let grupo = hashAtual;
     if(hashAtual.indexOf('leitor-') === 0){ /* mantém o hash completo, casa com o sub-item */ }
-    else if(hashAtual.indexOf('morador') === 0 || ['registrar-agua-','registrar-fralda-','registrar-higiene-','registrar-decubito-','registrar-alimentacao-','anotacao-','vitais-','evolucao-','katz-','editar-katz-'].some(p=>hashAtual.indexOf(p)===0)) grupo = 'moradores';
+    else if(hashAtual.indexOf('morador') === 0 || ['registrar-agua-','registrar-fralda-','registrar-higiene-','registrar-decubito-','registrar-curativo-','registrar-evacuacao-','registrar-diurese-','registrar-mobilidade-','registrar-pele-','registrar-comportamento-','registrar-dor-','registrar-alimentacao-','anotacao-','vitais-','evolucao-','katz-','editar-katz-','medicacoes-','administrar-'].some(p=>hashAtual.indexOf(p)===0)) grupo = 'moradores';
     else if(hashAtual.indexOf('funcionarios') === 0) grupo = 'funcionarios';
     document.querySelectorAll('#sidebar [data-hash]').forEach(a=>{
       a.classList.toggle('ativo', a.dataset.hash === grupo);
@@ -1423,6 +1423,7 @@
       moradorNomeCache[m.id] = m.nome;
       document.getElementById('mf-nome').textContent = m.nome || '—';
       const acoes = [
+        {chave:'medicacoes', hashBase:'medicacoes', editavel:false, ico:'💊', bg:'#eaf7f0', cor:'#1a6b4a', nome:'Medicações', desc:'Ver prescrições e marcar medicação administrada'},
         {chave:'agua', hashBase:'registrar-agua', editavel:false, ico:'💧', bg:'#eaf1fb', cor:'#4a6fa5', nome:'Bebeu água / Hidratação', desc:'Registrar copos de água'},
         {chave:'fralda', hashBase:'registrar-fralda', editavel:false, ico:'🧷', bg:'#fdecec', cor:'#c85a5a', nome:'Checar / Trocar fralda', desc:'Registrar situação e troca'},
         {chave:'alimentacao', hashBase:'registrar-alimentacao', editavel:false, ico:'🍽️', bg:'#fef2e8', cor:'#c77b3b', nome:'Alimentação', desc:'Registrar refeição e aceitação'},
@@ -1464,6 +1465,130 @@
     }catch(e){
       if(token !== viewToken) return;
       document.getElementById('mf-area').innerHTML = '⚠️ Não consegui carregar a ficha.<br><small>('+esc(e.message)+')</small>';
+    }
+  }
+
+  // ---------- MEDICAÇÕES ----------
+  function telaMedicacoes(moradorId){
+    const hashAtual = 'medicacoes-' + moradorId;
+    if(!exigirFuncionario(hashAtual)) return;
+    app.innerHTML = `
+      <div class="topo" style="background:linear-gradient(120deg,#2f6f6e,#1a6b4a)">
+        <button class="voltar" id="btn-voltar-morador">← Voltar</button>
+        <h1>💊 Medicações</h1>
+        <p>Prescrições ativas e o que já foi dado hoje</p>
+      </div>
+      ${bannerFuncionario(hashAtual)}
+      <div id="med-area" class="wrap"><div class="estado"><div class="spin"></div>Carregando...</div></div>
+      <div class="rodape">Village Viver Bem · Residencial Care · Medicações v1</div>
+    `;
+    document.getElementById('btn-voltar-morador').addEventListener('click', () => { location.hash = 'morador-' + moradorId; });
+    carregarMedicacoes(moradorId);
+  }
+
+  async function carregarMedicacoes(moradorId){
+    const token = viewToken;
+    const el = document.getElementById('med-area');
+    try{
+      const [prescricoes, admRecente] = await Promise.all([
+        api('prescricoes?select=*&morador_id=eq.'+encodeURIComponent(moradorId)+'&ativo=eq.true&order=medicamento'),
+        api('administracao_medicamentos?select=*&morador_id=eq.'+encodeURIComponent(moradorId)+'&order=data_hora.desc&limit=200')
+      ]);
+      if(token !== viewToken) return;
+      if(!prescricoes.length){
+        el.innerHTML = '<div class="estado">Nenhuma prescrição ativa cadastrada pra esse morador.</div>';
+        return;
+      }
+      const norm = s => String(s||'').trim().toLowerCase();
+      const dataSP = iso => { try{ return new Date(iso).toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'}); }catch(_e){ return ''; } };
+      const hojeSP = new Date().toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'});
+      const admHoje = admRecente.filter(a => dataSP(a.data_hora) === hojeSP);
+      el.innerHTML = prescricoes.map(p=>{
+        const doHoje = admHoje.filter(a => norm(a.medicamento) === norm(p.medicamento));
+        const dado = doHoje.some(a => norm(a.status).indexOf('adminis') >= 0);
+        const badge = dado
+          ? '<span style="font-size:11px;font-weight:700;color:#1e8449;background:#eaf7f0;padding:4px 10px;border-radius:20px;white-space:nowrap">✅ Dado hoje'+(doHoje.length>1?' x'+doHoje.length:'')+'</span>'
+          : '<span style="font-size:11px;font-weight:700;color:#c0392b;background:#fdecec;padding:4px 10px;border-radius:20px;white-space:nowrap">⏳ Pendente</span>';
+        return `<div class="morador js-med" data-id="${esc(p.id)}" style="cursor:pointer">
+          <div class="av">💊</div>
+          <div style="flex:1">
+            <div class="nome">${esc(p.medicamento)}</div>
+            <div class="quarto">${esc(p.dose||'')}${p.via?' · '+esc(p.via):''}${p.horario?' · '+esc(p.horario):''}</div>
+          </div>
+          ${badge}
+        </div>`;
+      }).join('');
+      el.querySelectorAll('.js-med').forEach(div=>{
+        tornarClicavel(div, ()=>{ location.hash = 'administrar-' + div.dataset.id; });
+      });
+    }catch(e){
+      if(token !== viewToken) return;
+      el.innerHTML = '⚠️ Não consegui carregar. <br><small>('+esc(e.message)+')</small>';
+    }
+  }
+
+  let administrarStatus = null;
+
+  function telaAdministrarMedicamento(prescricaoId){
+    if(!exigirFuncionario('administrar-'+prescricaoId)) return;
+    administrarStatus = null;
+    app.innerHTML = `
+      <div class="topo" style="background:linear-gradient(120deg,#2f6f6e,#1a6b4a)">
+        <button class="voltar" id="am-voltar" onclick="history.back()">← Voltar</button>
+        <h1>💊 Administrar medicamento</h1>
+        <p id="am-nome">Carregando...</p>
+      </div>
+      <div id="am-area" class="wrap"><div class="estado"><div class="spin"></div>Carregando...</div></div>
+    `;
+    carregarAdministrarMedicamento(prescricaoId);
+  }
+
+  async function carregarAdministrarMedicamento(prescricaoId){
+    const token = viewToken;
+    try{
+      const rows = await api('prescricoes?select=*&id=eq.'+encodeURIComponent(prescricaoId));
+      if(token !== viewToken) return;
+      const p = rows[0];
+      const area = document.getElementById('am-area');
+      if(!p){ area.innerHTML = '⚠️ Prescrição não encontrada.'; return; }
+      document.getElementById('am-nome').textContent = p.medicamento + (p.dose ? ' · ' + p.dose : '');
+      area.innerHTML = `
+        <div style="font-size:14px;font-weight:600;color:var(--teal-esc);margin-bottom:10px">Situação</div>
+        <div class="chip-opcoes" id="am-chips">
+          ${['Administrado','Recusado','Adiado'].map(v=>`<div class="chip" data-valor="${esc(v)}">${esc(v)}</div>`).join('')}
+        </div>
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:14px 0 4px">Observação (opcional)</label>
+        <textarea id="am-obs" rows="2" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px"></textarea>
+        <button id="am-salvar" style="width:100%;background:#1a6b4a;color:#fff;border:none;border-radius:14px;padding:14px;font-size:15px;font-weight:700;margin-top:14px">Salvar</button>
+        <div id="am-msg" style="text-align:center;font-size:12.5px;color:var(--muted);margin-top:10px"></div>
+      `;
+      ligarChips('am-chips', v => administrarStatus = v);
+      document.getElementById('am-salvar').addEventListener('click', () => salvarAdministrarMedicamento(p));
+    }catch(e){
+      if(token !== viewToken) return;
+      document.getElementById('am-area').innerHTML = '⚠️ Não consegui carregar. <br><small>('+esc(e.message)+')</small>';
+    }
+  }
+
+  async function salvarAdministrarMedicamento(p){
+    const msg = document.getElementById('am-msg');
+    if(!administrarStatus){ msg.textContent = 'Escolha uma opção.'; return; }
+    const f = funcionarioAtual();
+    if(!f){ location.hash = 'funcionarios?v=' + encodeURIComponent('administrar-'+p.id); return; }
+    const obs = document.getElementById('am-obs').value.trim();
+    msg.textContent = 'Salvando...';
+    const btn = document.getElementById('am-salvar');
+    if(btn) btn.disabled = true;
+    try{
+      await apiWrite('administracao_medicamentos', 'POST', {
+        morador_id: p.morador_id, morador_nome: p.morador_nome, medicamento: p.medicamento,
+        dose: p.dose, via: p.via, horario_previsto: p.horario, status: administrarStatus,
+        administrado_por: f.nome, observacao: obs || null, data_hora: new Date().toISOString()
+      });
+      location.hash = 'medicacoes-' + p.morador_id;
+    }catch(e){
+      msg.textContent = '⚠️ Erro: ' + esc(e.message) + '.';
+      if(btn) btn.disabled = false;
     }
   }
 
@@ -2105,6 +2230,8 @@
     else if((m = apósPrefixo(hash, 'evolucao-')) !== null) telaEvolucao(m);
     else if((m = apósPrefixo(hash, 'katz-')) !== null) telaKatz(m);
     else if((m = apósPrefixo(hash, 'morador-editar-')) !== null) telaMoradorEditar(m);
+    else if((m = apósPrefixo(hash, 'medicacoes-')) !== null) telaMedicacoes(m);
+    else if((m = apósPrefixo(hash, 'administrar-')) !== null) telaAdministrarMedicamento(m);
     else if((m = apósPrefixo(hash, 'morador-')) !== null) telaMoradorFicha(m);
     else if(SETORES[hash]) { if(garantirAcessoSetor(hash)) telaSetor(hash); }
     else telaInicio();
