@@ -836,6 +836,7 @@
       if(token !== viewToken) return;
       const el = document.getElementById('lista');
       document.getElementById('contador').textContent = moradores.length + (moradores.length===1?' morador':' moradores');
+      const souAdmin = !!(funcionarioAtual() && funcionarioAtual().admin);
       if(!moradores.length){
         el.innerHTML = '<div class="estado">Nenhum morador cadastrado ainda.<br>Toque em "Cadastrar novo morador" acima.</div>';
       }else{
@@ -843,10 +844,17 @@
         moradores.forEach(m=>{
           const nome = (m.nome||'—').toString().trim();
           const quarto = m.quarto ? ('Quarto ' + esc(String(m.quarto).trim())) : 'Sem quarto';
-          html += `<div class="morador js-morador" data-id="${esc(m.id)}" style="cursor:pointer">
+          const arquivado = m.ativo === false;
+          const acoesAdmin = souAdmin ? `
+            <a href="#morador-editar-${esc(m.id)}" class="js-morador-editar" data-id="${esc(m.id)}" data-stop="1" style="padding:8px 8px;color:var(--muted)" title="Editar">✏️</a>
+            <a href="#" class="js-morador-arquivar" data-id="${esc(m.id)}" data-ativo="${arquivado?'0':'1'}" data-nome="${esc(nome)}" data-stop="1" style="padding:8px 8px;color:var(--muted)" title="${arquivado?'Reativar':'Arquivar'}">${arquivado?'♻️':'🗄️'}</a>
+            <a href="#" class="js-morador-excluir" data-id="${esc(m.id)}" data-nome="${esc(nome)}" data-stop="1" style="padding:8px 8px;color:#c0392b" title="Excluir permanentemente">🗑️</a>
+          ` : '';
+          html += `<div class="morador js-morador" data-id="${esc(m.id)}" style="cursor:pointer${arquivado?';opacity:.55':''}">
             <div class="av">${esc(iniciais(nome))}</div>
-            <div style="flex:1"><div class="nome">${esc(nome)}</div><div class="quarto">🚪 ${quarto}</div></div>
+            <div style="flex:1"><div class="nome">${esc(nome)}${arquivado?' <span style="font-size:10.5px;color:var(--muted);font-weight:700">· ARQUIVADO</span>':''}</div><div class="quarto">🚪 ${quarto}</div></div>
             <a class="btn-scan" href="#leitor-farmacia" data-stop="1">📷 Ler código</a>
+            ${acoesAdmin}
           </div>`;
         });
         el.innerHTML = html;
@@ -858,6 +866,12 @@
         el.querySelectorAll('[data-stop]').forEach(a=>{
           a.addEventListener('click', e=>e.stopPropagation());
         });
+        el.querySelectorAll('.js-morador-arquivar').forEach(a=>{
+          a.addEventListener('click', e=>{ e.preventDefault(); arquivarMorador(a.dataset.id, a.dataset.ativo === '1', a.dataset.nome); });
+        });
+        el.querySelectorAll('.js-morador-excluir').forEach(a=>{
+          a.addEventListener('click', e=>{ e.preventDefault(); excluirMorador(a.dataset.id, a.dataset.nome); });
+        });
       }
       const agora = new Date();
       document.getElementById('quando').textContent = 'Atualizado ' + agora.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
@@ -867,6 +881,91 @@
       document.getElementById('quando').textContent = 'Erro ao carregar';
     }
   };
+
+  async function arquivarMorador(id, estaAtivo, nome){
+    const acao = estaAtivo ? 'arquivar' : 'reativar';
+    if(!confirm((estaAtivo ? 'Arquivar' : 'Reativar') + ' "' + nome + '"?' + (estaAtivo ? ' Ele deixa de aparecer nas listas principais, mas o histórico dele é mantido.' : ''))) return;
+    try{
+      await apiWrite('moradores?id=eq.'+encodeURIComponent(id), 'PATCH', {ativo: !estaAtivo});
+      carregarMoradores();
+    }catch(e){
+      alert('⚠️ Não consegui ' + acao + ': ' + e.message);
+    }
+  }
+
+  async function excluirMorador(id, nome){
+    if(!confirm('Excluir "' + nome + '" PERMANENTEMENTE? Isso não pode ser desfeito. Se esse morador já tiver registros de cuidado, sinais vitais ou prescrições, a exclusão pode falhar — nesse caso, use "Arquivar" em vez de excluir.')) return;
+    try{
+      await apiWrite('moradores?id=eq.'+encodeURIComponent(id), 'DELETE');
+      carregarMoradores();
+    }catch(e){
+      alert('⚠️ Não consegui excluir: ' + e.message + '\n\nSe o erro for de referência/chave estrangeira, use "Arquivar" em vez de excluir — esse morador já tem histórico registrado.');
+    }
+  }
+
+  function telaMoradorEditar(id){
+    if(!exigirAdmin()) return;
+    app.innerHTML = `
+      <div class="topo" style="background:linear-gradient(120deg,var(--teal),var(--verde))">
+        <button class="voltar" onclick="location.hash='moradores'">← Voltar</button>
+        <h1>✏️ Editar morador</h1>
+        <p>Nome, quarto e sexo</p>
+      </div>
+      <div id="me-area" class="wrap"><div class="estado"><div class="spin"></div>Carregando...</div></div>
+      <div class="rodape">Village Viver Bem · Residencial Care · Moradores v1</div>
+    `;
+    carregarMoradorEditar(id);
+  }
+
+  async function carregarMoradorEditar(id){
+    const token = viewToken;
+    const el = document.getElementById('me-area');
+    try{
+      const rows = await api('moradores?select=id,nome,quarto,sexo,ativo&id=eq.'+encodeURIComponent(id));
+      if(token !== viewToken) return;
+      const m = rows[0];
+      if(!m){ el.innerHTML = '⚠️ Morador não encontrado.'; return; }
+      const sexoAtual = m.sexo || '';
+      const opcoesSexo = ['', 'Masculino', 'Feminino'].map(function(s){
+        const label = s || '— não informado —';
+        return '<option value="'+esc(s)+'"'+(s===sexoAtual?' selected':'')+'>'+esc(label)+'</option>';
+      }).join('');
+      el.innerHTML = `
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:10px 0 4px">Nome</label>
+        <input id="me-nome" type="text" value="${esc(m.nome||'')}" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">Quarto</label>
+        <input id="me-quarto" type="text" value="${esc(m.quarto||'')}" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">Sexo</label>
+        <select id="me-sexo" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">${opcoesSexo}</select>
+        <label style="display:flex;align-items:center;gap:8px;margin-top:14px;font-size:13.5px;color:var(--muted)">
+          <input id="me-ativo" type="checkbox" ${m.ativo!==false?'checked':''} style="width:18px;height:18px">
+          Ativo (desmarque pra arquivar — some das listas principais, mas mantém o histórico)
+        </label>
+        <button id="me-salvar" style="width:100%;background:var(--teal);color:#fff;border:none;border-radius:14px;padding:14px;font-size:15px;font-weight:700;margin-top:18px">💾 Salvar</button>
+        <div id="me-msg" style="text-align:center;font-size:12.5px;color:var(--muted);margin-top:10px"></div>
+      `;
+      document.getElementById('me-salvar').addEventListener('click', ()=>salvarMoradorEditar(id));
+    }catch(e){
+      if(token !== viewToken) return;
+      el.innerHTML = '⚠️ Não consegui carregar. <br><small>('+esc(e.message)+')</small>';
+    }
+  }
+
+  async function salvarMoradorEditar(id){
+    const msg = document.getElementById('me-msg');
+    const nome = document.getElementById('me-nome').value.trim();
+    const quarto = document.getElementById('me-quarto').value.trim();
+    const sexo = document.getElementById('me-sexo').value;
+    const ativo = document.getElementById('me-ativo').checked;
+    if(!nome){ msg.textContent = 'Preencha o nome.'; return; }
+    msg.textContent = 'Salvando...';
+    try{
+      await apiWrite('moradores?id=eq.'+encodeURIComponent(id), 'PATCH', {nome, quarto: quarto || null, sexo: sexo || null, ativo});
+      location.hash = 'moradores';
+    }catch(e){
+      msg.textContent = '⚠️ Erro ao salvar: ' + esc(e.message);
+    }
+  }
 
   // ---------- EQUIPE (login por PIN, sem digitar nome toda vez) ----------
   function funcionarioAtual(){
@@ -1958,6 +2057,7 @@
     else if((m = apósPrefixo(hash, 'vitais-')) !== null) telaVitais(m);
     else if((m = apósPrefixo(hash, 'evolucao-')) !== null) telaEvolucao(m);
     else if((m = apósPrefixo(hash, 'katz-')) !== null) telaKatz(m);
+    else if((m = apósPrefixo(hash, 'morador-editar-')) !== null) telaMoradorEditar(m);
     else if((m = apósPrefixo(hash, 'morador-')) !== null) telaMoradorFicha(m);
     else if(SETORES[hash]) { if(garantirAcessoSetor(hash)) telaSetor(hash); }
     else telaInicio();
