@@ -127,6 +127,8 @@
   .sb-link .ico{font-size:17px;width:20px;text-align:center;flex-shrink:0}
   .sb-link:active{background:#f4f7f7}
   .sb-link.ativo{background:var(--cor-bg,#e8f4f4);color:var(--teal-esc);border-left-color:var(--teal)}
+  .sb-badge{margin-left:auto;background:#c0392b;color:#fff;font-size:10.5px;font-weight:700;line-height:1;padding:3px 6px;border-radius:20px;display:none}
+  .sb-badge.mostrar{display:inline-block}
   .sb-sep{margin:10px 18px;border-top:1px solid var(--borda)}
   .sb-sub{display:flex;align-items:center;gap:9px;padding:8px 18px 8px 40px;color:var(--muted);font-size:12.5px;font-weight:600;border-left:3px solid transparent}
   .sb-sub .ico{font-size:14px;width:16px;text-align:center;flex-shrink:0}
@@ -151,20 +153,20 @@
     <div class="sb-logo">🌳 Village Viver Bem</div>
     <a class="sb-link" data-hash="inicio" href="#inicio"><span class="ico">🏠</span>Início</a>
     <a class="sb-link" id="sb-painel" href="#"><span class="ico">📊</span>Visão Geral</a>
-    <a class="sb-link" data-hash="farmacia" href="#farmacia"><span class="ico">💊</span>Farmácia</a>
+    <a class="sb-link" data-hash="farmacia" href="#farmacia"><span class="ico">💊</span>Farmácia<span class="sb-badge" id="bd-farmacia"></span></a>
     <a class="sb-sub" data-hash="leitor-farmacia" href="#leitor-farmacia"><span class="ico">📷</span>Leitor rápido</a>
     <a class="sb-sub" data-hash="medicamentos" id="sb-medicamentos" href="#"><span class="ico">💊</span>Medicamentos</a>
-    <a class="sb-link" data-hash="cozinha" href="#cozinha"><span class="ico">🍳</span>Cozinha</a>
+    <a class="sb-link" data-hash="cozinha" href="#cozinha"><span class="ico">🍳</span>Cozinha<span class="sb-badge" id="bd-cozinha"></span></a>
     <a class="sb-sub" data-hash="leitor-cozinha" href="#leitor-cozinha"><span class="ico">📷</span>Leitor rápido</a>
-    <a class="sb-link" data-hash="lavanderia" href="#lavanderia"><span class="ico">🧺</span>Rouparia &amp; Lavanderia</a>
+    <a class="sb-link" data-hash="lavanderia" href="#lavanderia"><span class="ico">🧺</span>Rouparia &amp; Lavanderia<span class="sb-badge" id="bd-lavanderia"></span></a>
     <a class="sb-sub" data-hash="leitor-lavanderia" href="#leitor-lavanderia"><span class="ico">📷</span>Leitor rápido</a>
-    <a class="sb-link" data-hash="secretaria" href="#secretaria"><span class="ico">📋</span>Secretaria</a>
+    <a class="sb-link" data-hash="secretaria" href="#secretaria"><span class="ico">📋</span>Secretaria<span class="sb-badge" id="bd-secretaria"></span></a>
     <a class="sb-sub" data-hash="leitor-secretaria" href="#leitor-secretaria"><span class="ico">📷</span>Leitor rápido</a>
-    <a class="sb-link" data-hash="enfermagem" href="#enfermagem"><span class="ico">🩺</span>Enfermagem</a>
+    <a class="sb-link" data-hash="enfermagem" href="#enfermagem"><span class="ico">🩺</span>Enfermagem<span class="sb-badge" id="bd-enfermagem"></span></a>
     <a class="sb-sub" data-hash="leitor-enfermagem" href="#leitor-enfermagem"><span class="ico">📷</span>Leitor rápido</a>
     <div class="sb-sep"></div>
-    <a class="sb-link" data-hash="moradores" href="#moradores"><span class="ico">🧑‍🦳</span>Moradores</a>
-    <a class="sb-link" data-hash="intercorrencias" href="#intercorrencias"><span class="ico">🚨</span>Intercorrências</a>
+    <a class="sb-link" data-hash="moradores" href="#moradores"><span class="ico">🧑‍🦳</span>Moradores<span class="sb-badge" id="bd-moradores"></span></a>
+    <a class="sb-link" data-hash="intercorrencias" href="#intercorrencias"><span class="ico">🚨</span>Intercorrências<span class="sb-badge" id="bd-intercorrencias"></span></a>
     <a class="sb-link" data-hash="funcionarios" href="#funcionarios"><span class="ico">🧑‍⚕️</span>Equipe</a>
     <a class="sb-link" data-hash="estoque" href="#estoque"><span class="ico">📊</span>Ver Estoque Geral</a>
     <div class="sb-sep"></div>
@@ -225,6 +227,56 @@
     document.querySelectorAll('#sidebar [data-hash]').forEach(a=>{
       a.classList.toggle('ativo', a.dataset.hash === grupo);
     });
+  }
+
+  function setBadge(id, n){
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.textContent = n > 99 ? '99+' : String(n);
+    el.classList.toggle('mostrar', n > 0);
+  }
+
+  async function atualizarBadgesSidebar(){
+    try{
+      const dataSP = iso => { try{ return new Date(iso).toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'}); }catch(_e){ return ''; } };
+      const hojeSP = new Date().toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'});
+      const norm2 = s => String(s||'').trim().toLowerCase();
+      const setNaoAberta = ['resolvida','resolvido','fechada','fechado','concluida','concluída'];
+      const [produtos, intercTodas, sinaisRecentes, prescricoesAtivas, admRecente] = await Promise.all([
+        api('produtos?select=setor,estoque_atual,estoque_minimo'),
+        api('intercorrencias?select=status').catch(()=>[]),
+        api('sinais_vitais?select=alertas,data_hora&order=data_hora.desc&limit=300').catch(()=>[]),
+        api('prescricoes?select=morador_id,medicamento&ativo=eq.true').catch(()=>[]),
+        api('administracao_medicamentos?select=morador_id,medicamento,status,data_hora&order=data_hora.desc&limit=500').catch(()=>[])
+      ]);
+
+      const baixoPorSetor = {};
+      produtos.forEach(p=>{
+        const s = norm2(p.setor);
+        const est = Number(p.estoque_atual)||0, min = Number(p.estoque_minimo)||0;
+        if(min>0 && est<=min) baixoPorSetor[s] = (baixoPorSetor[s]||0) + 1;
+      });
+
+      const admHoje = admRecente.filter(a => dataSP(a.data_hora) === hojeSP);
+      const medAdministrado = (medName, moradorId) => admHoje.some(a => a.morador_id === moradorId && norm2(a.medicamento) === norm2(medName) && norm2(a.status).indexOf('adminis') >= 0);
+      const moradoresComPendencia = new Set();
+      prescricoesAtivas.forEach(p=>{
+        if(!medAdministrado(p.medicamento, p.morador_id)) moradoresComPendencia.add(p.morador_id);
+      });
+
+      const intercAbertas = intercTodas.filter(r => setNaoAberta.indexOf(norm2(r.status)) === -1).length;
+
+      const seteDiasAtras = Date.now() - 7*86400000;
+      const sinaisAlerta = sinaisRecentes.filter(s => s.alertas && String(s.alertas).trim() && new Date(s.data_hora).getTime() >= seteDiasAtras).length;
+
+      setBadge('bd-farmacia', (baixoPorSetor.farmacia||0) + moradoresComPendencia.size);
+      setBadge('bd-cozinha', baixoPorSetor.cozinha||0);
+      setBadge('bd-lavanderia', baixoPorSetor.lavanderia||0);
+      setBadge('bd-secretaria', baixoPorSetor.secretaria||0);
+      setBadge('bd-enfermagem', baixoPorSetor.enfermagem||0);
+      setBadge('bd-moradores', sinaisAlerta);
+      setBadge('bd-intercorrencias', intercAbertas);
+    }catch(_e){ /* sininho é best-effort — se falhar, só não mostra, não trava o app */ }
   }
 
   const SETORES_ESTOQUE = {
@@ -2936,6 +2988,7 @@
   }
   window.addEventListener('hashchange', router);
   router();
+  atualizarBadgesSidebar();
 </script>
 </body>
 </html>
