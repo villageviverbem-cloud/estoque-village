@@ -164,6 +164,7 @@
     <a class="sb-sub" data-hash="leitor-enfermagem" href="#leitor-enfermagem"><span class="ico">📷</span>Leitor rápido</a>
     <div class="sb-sep"></div>
     <a class="sb-link" data-hash="moradores" href="#moradores"><span class="ico">🧑‍🦳</span>Moradores</a>
+    <a class="sb-link" data-hash="intercorrencias" href="#intercorrencias"><span class="ico">🚨</span>Intercorrências</a>
     <a class="sb-link" data-hash="funcionarios" href="#funcionarios"><span class="ico">🧑‍⚕️</span>Equipe</a>
     <a class="sb-link" data-hash="estoque" href="#estoque"><span class="ico">📊</span>Ver Estoque Geral</a>
     <div class="sb-sep"></div>
@@ -220,7 +221,7 @@
   function atualizarSidebarAtiva(hashAtual){
     let grupo = hashAtual;
     if(hashAtual.indexOf('leitor-') === 0){ /* mantém o hash completo, casa com o sub-item */ }
-    else if(hashAtual.indexOf('morador') === 0 || ['registrar-agua-','registrar-fralda-','registrar-higiene-','registrar-decubito-','registrar-curativo-','registrar-evacuacao-','registrar-diurese-','registrar-mobilidade-','registrar-pele-','registrar-comportamento-','registrar-dor-','registrar-alimentacao-','anotacao-','vitais-','evolucao-','katz-','editar-katz-','medicacoes-','administrar-'].some(p=>hashAtual.indexOf(p)===0)) grupo = 'moradores';
+    else if(hashAtual.indexOf('morador') === 0 || ['registrar-agua-','registrar-fralda-','registrar-higiene-','registrar-decubito-','registrar-curativo-','registrar-evacuacao-','registrar-diurese-','registrar-mobilidade-','registrar-pele-','registrar-comportamento-','registrar-dor-','registrar-alimentacao-','registrar-intercorrencia-','anotacao-','vitais-','evolucao-','katz-','editar-katz-','medicacoes-','administrar-'].some(p=>hashAtual.indexOf(p)===0)) grupo = 'moradores';
     else if(hashAtual.indexOf('funcionarios') === 0) grupo = 'funcionarios';
     document.querySelectorAll('#sidebar [data-hash]').forEach(a=>{
       a.classList.toggle('ativo', a.dataset.hash === grupo);
@@ -1424,6 +1425,7 @@
       document.getElementById('mf-nome').textContent = m.nome || '—';
       const acoes = [
         {chave:'medicacoes', hashBase:'medicacoes', editavel:false, ico:'💊', bg:'#eaf7f0', cor:'#1a6b4a', nome:'Medicações', desc:'Ver prescrições e marcar medicação administrada'},
+        {chave:'intercorrencia', hashBase:'registrar-intercorrencia', editavel:false, ico:'🚨', bg:'#fdecec', cor:'#c0392b', nome:'Intercorrência', desc:'Registrar queda, evento ou ocorrência'},
         {chave:'agua', hashBase:'registrar-agua', editavel:false, ico:'💧', bg:'#eaf1fb', cor:'#4a6fa5', nome:'Bebeu água / Hidratação', desc:'Registrar copos de água'},
         {chave:'fralda', hashBase:'registrar-fralda', editavel:false, ico:'🧷', bg:'#fdecec', cor:'#c85a5a', nome:'Checar / Trocar fralda', desc:'Registrar situação e troca'},
         {chave:'alimentacao', hashBase:'registrar-alimentacao', editavel:false, ico:'🍽️', bg:'#fef2e8', cor:'#c77b3b', nome:'Alimentação', desc:'Registrar refeição e aceitação'},
@@ -1592,13 +1594,143 @@
     }
   }
 
+  // ---------- INTERCORRÊNCIA ----------
+  const INTERCORRENCIA_TIPOS = ['Queda','Agressão','Fuga / Saída não autorizada','Recusa de cuidado','Alteração de comportamento','Mal súbito','Óbito','Outro'];
+  const INTERCORRENCIA_GRAVIDADES = ['Leve','Moderada','Grave'];
+  let intercorrenciaTipo = null;
+  let intercorrenciaGravidade = null;
+
+  function telaRegistrarIntercorrencia(moradorId){
+    const hashAtual = 'registrar-intercorrencia-' + moradorId;
+    if(!exigirFuncionario(hashAtual)) return;
+    intercorrenciaTipo = null;
+    intercorrenciaGravidade = null;
+    app.innerHTML = `
+      <div class="topo" style="background:linear-gradient(120deg,#c0392b,#922b21)">
+        <button class="voltar" id="btn-voltar-morador">← Voltar</button>
+        <h1>🚨 Registrar Intercorrência</h1>
+      </div>
+      ${bannerFuncionario(hashAtual)}
+      <div class="wrap">
+        <div style="font-size:14px;font-weight:600;color:var(--teal-esc);margin-bottom:10px">Tipo</div>
+        <div class="chip-opcoes" id="ic-tipo">
+          ${INTERCORRENCIA_TIPOS.map(v=>`<div class="chip" data-valor="${esc(v)}">${esc(v)}</div>`).join('')}
+        </div>
+        <div style="font-size:14px;font-weight:600;color:var(--teal-esc);margin:16px 0 10px">Gravidade</div>
+        <div class="chip-opcoes" id="ic-gravidade">
+          ${INTERCORRENCIA_GRAVIDADES.map(v=>`<div class="chip" data-valor="${esc(v)}">${esc(v)}</div>`).join('')}
+        </div>
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:14px 0 4px">Local (opcional)</label>
+        <input id="ic-local" type="text" placeholder="Ex.: Quarto, Banheiro, Refeitório" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:14px 0 4px">Descrição</label>
+        <textarea id="ic-descricao" rows="4" placeholder="Descreva o que aconteceu, condutas tomadas..." style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px"></textarea>
+        <button id="ic-salvar" style="width:100%;background:#c0392b;color:#fff;border:none;border-radius:14px;padding:14px;font-size:15px;font-weight:700;margin-top:14px">🚨 Registrar intercorrência</button>
+        <div id="ic-msg" style="text-align:center;font-size:12.5px;color:var(--muted);margin-top:10px"></div>
+      </div>
+    `;
+    document.getElementById('btn-voltar-morador').addEventListener('click', () => { location.hash = 'morador-' + moradorId; });
+    ligarChips('ic-tipo', v => intercorrenciaTipo = v);
+    ligarChips('ic-gravidade', v => intercorrenciaGravidade = v);
+    document.getElementById('ic-salvar').addEventListener('click', () => salvarIntercorrencia(moradorId));
+  }
+
+  async function salvarIntercorrencia(moradorId){
+    const msg = document.getElementById('ic-msg');
+    const descricao = document.getElementById('ic-descricao').value.trim();
+    if(!intercorrenciaTipo){ msg.textContent = 'Escolha o tipo.'; return; }
+    if(!intercorrenciaGravidade){ msg.textContent = 'Escolha a gravidade.'; return; }
+    if(!descricao){ msg.textContent = 'Descreva o que aconteceu.'; return; }
+    const f = funcionarioAtual();
+    if(!f){ location.hash = 'funcionarios?v=' + encodeURIComponent('registrar-intercorrencia-'+moradorId); return; }
+    const local = document.getElementById('ic-local').value.trim();
+    msg.textContent = 'Salvando...';
+    const btn = document.getElementById('ic-salvar');
+    if(btn) btn.disabled = true;
+    try{
+      const moradorNome = await nomeDoMorador(moradorId);
+      await apiWrite('intercorrencias', 'POST', {
+        morador_id: moradorId, morador_nome: moradorNome, tipo: intercorrenciaTipo,
+        gravidade: intercorrenciaGravidade, local: local || null, descricao,
+        reportado_por: f.nome, status: 'aberta', data_hora: new Date().toISOString()
+      });
+      location.hash = 'morador-' + moradorId;
+    }catch(e){
+      msg.textContent = '⚠️ Erro: ' + esc(e.message) + '. Se a tabela "intercorrencias" não existe, rode o SQL que te mandei.';
+      if(btn) btn.disabled = false;
+    }
+  }
+
+  // ---------- LISTA DE INTERCORRÊNCIAS ----------
+  function telaIntercorrencias(){
+    if(!exigirFuncionario('intercorrencias')) return;
+    app.innerHTML = `
+      <div class="topo" style="background:linear-gradient(120deg,#c0392b,#922b21)">
+        <button class="voltar" onclick="voltarParaIlpi()">← Voltar</button>
+        <h1>🚨 Intercorrências</h1>
+        <p>Abertas primeiro, mais recentes no topo</p>
+      </div>
+      <div class="titulo-sec" style="padding:20px 20px 4px;font-size:12.5px;color:var(--muted)">Pra registrar uma nova, abre a ficha do morador e usa o card "Intercorrência".</div>
+      <div id="ic-lista" class="wrap"><div class="estado"><div class="spin"></div>Carregando...</div></div>
+      <div class="rodape">Village Viver Bem · Residencial Care · Intercorrências v1</div>
+    `;
+    carregarIntercorrencias();
+  }
+
+  async function carregarIntercorrencias(){
+    const token = viewToken;
+    const el = document.getElementById('ic-lista');
+    try{
+      const lista = await api('intercorrencias?select=*&order=data_hora.desc&limit=200');
+      if(token !== viewToken) return;
+      if(!lista.length){ el.innerHTML = '<div class="estado">Nenhuma intercorrência registrada ainda.</div>'; return; }
+      const aberta = s => { const x = String(s||'').trim().toLowerCase(); return ['resolvida','resolvido','fechada','fechado','concluida','concluída'].indexOf(x) === -1; };
+      const ordenada = lista.slice().sort((a,b) => (aberta(b.status)?1:0) - (aberta(a.status)?1:0) || new Date(b.data_hora) - new Date(a.data_hora));
+      const corGravidade = { grave: '#c0392b', moderada: '#c9a227', leve: '#2f9e6f' };
+      el.innerHTML = ordenada.map(r=>{
+        const g = String(r.gravidade||'').toLowerCase();
+        const cor = corGravidade[g] || 'var(--muted)';
+        const d = r.data_hora ? new Date(r.data_hora) : null;
+        const dstr = d ? d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+' às '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) : '';
+        const estaAberta = aberta(r.status);
+        const botao = estaAberta ? `<a href="#" class="js-ic-resolver" data-id="${esc(r.id)}" data-stop="1" style="padding:8px 10px;color:#1e8449;white-space:nowrap" title="Marcar resolvida">✅ Resolver</a>` : '';
+        return `<div class="morador" style="align-items:flex-start${estaAberta?'':';opacity:.6'}">
+          <div class="av" style="background:${cor}22;color:${cor}">🚨</div>
+          <div style="flex:1">
+            <div class="nome">${esc(r.morador_nome||'—')} <span style="font-size:10.5px;font-weight:700;color:${cor}">· ${esc(r.gravidade||'—')}</span></div>
+            <div class="quarto">${esc(r.tipo||'')}${r.local?' · '+esc(r.local):''} · ${dstr}</div>
+            <div class="quarto" style="margin-top:3px">${esc(r.descricao||'')}</div>
+            <div class="quarto" style="margin-top:3px;font-style:italic">Status: ${esc(r.status||'aberta')}${r.reportado_por?' · Por: '+esc(r.reportado_por):''}</div>
+          </div>
+          ${botao}
+        </div>`;
+      }).join('');
+      el.querySelectorAll('.js-ic-resolver').forEach(a=>{
+        a.addEventListener('click', e=>{ e.preventDefault(); resolverIntercorrencia(a.dataset.id); });
+      });
+    }catch(e){
+      if(token !== viewToken) return;
+      el.innerHTML = '⚠️ Não consegui carregar. <br><small>('+esc(e.message)+')</small>';
+    }
+  }
+
+  async function resolverIntercorrencia(id){
+    if(!confirm('Marcar essa intercorrência como resolvida?')) return;
+    try{
+      await apiWrite('intercorrencias?id=eq.'+encodeURIComponent(id), 'PATCH', {status: 'resolvida'});
+      carregarIntercorrencias();
+    }catch(e){
+      alert('⚠️ Não consegui marcar como resolvida: ' + e.message);
+    }
+  }
+
   async function carregarHistoricoCuidado(id, token){
     try{
-      const [regsResult, katzResult, vitaisResult, evolucaoResult] = await Promise.allSettled([
+      const [regsResult, katzResult, vitaisResult, evolucaoResult, intercResult] = await Promise.allSettled([
         api('registros_cuidado?select=*&morador_id=eq.'+encodeURIComponent(id)+'&order=data_hora.desc&limit=15'),
         api('avaliacoes_katz?select=*&morador_id=eq.'+encodeURIComponent(id)+'&order=data_hora.desc&limit=15'),
         api('sinais_vitais?select=*&morador_id=eq.'+encodeURIComponent(id)+'&order=data_hora.desc&limit=15'),
-        api('evolucoes_diarias?select=*&morador_id=eq.'+encodeURIComponent(id)+'&order=data_hora.desc&limit=15')
+        api('evolucoes_diarias?select=*&morador_id=eq.'+encodeURIComponent(id)+'&order=data_hora.desc&limit=15'),
+        api('intercorrencias?select=*&morador_id=eq.'+encodeURIComponent(id)+'&order=data_hora.desc&limit=15')
       ]);
       // Cada tabela é buscada de forma independente: se uma ainda não existir
       // (ex: alguma tabela nova não criada ainda), as outras continuam aparecendo normal.
@@ -1606,6 +1738,7 @@
       const katz = katzResult.status === 'fulfilled' ? katzResult.value : [];
       const vitais = vitaisResult.status === 'fulfilled' ? vitaisResult.value : [];
       const evolucao = evolucaoResult.status === 'fulfilled' ? evolucaoResult.value : [];
+      const interc = intercResult.status === 'fulfilled' ? intercResult.value : [];
       if(token !== viewToken) return;
       const el = document.getElementById('mf-historico');
       if(!el) return;
@@ -1613,10 +1746,11 @@
         ...regs.map(r => ({tipo: r.tipo, valor: r.valor, quem: r.funcionario_nome, data_hora: r.data_hora})),
         ...katz.map(k => ({tipo: 'katz', valor: 'Escala de Katz — ' + (k.classificacao||'') + ' (' + (k.escore_total ?? '—') + '/6)', quem: k.avaliador, data_hora: k.data_hora})),
         ...vitais.map(v => ({tipo: 'vitais', valor: 'Sinais vitais — PA ' + (v.pa_sistolica ?? '—') + '/' + (v.pa_diastolica ?? '—') + (v.alertas ? ' ⚠️ ' + v.alertas : ''), quem: v.funcionario_nome, data_hora: v.data_hora})),
-        ...evolucao.map(e => ({tipo: 'evolucao', valor: 'Evolução — ' + (e.turno || 'turno não informado'), quem: e.funcionario_nome, data_hora: e.data_hora}))
+        ...evolucao.map(e => ({tipo: 'evolucao', valor: 'Evolução — ' + (e.turno || 'turno não informado'), quem: e.funcionario_nome, data_hora: e.data_hora})),
+        ...interc.map(i => ({tipo: 'intercorrencia', valor: '🚨 ' + (i.tipo||'Intercorrência') + ' (' + (i.gravidade||'—') + ') — ' + (i.status||'aberta'), quem: i.reportado_por, data_hora: i.data_hora}))
       ].sort((a,b) => new Date(b.data_hora) - new Date(a.data_hora)).slice(0, 15);
       if(!itens.length){ el.innerHTML = '<div class="estado">Nenhum registro ainda.</div>'; return; }
-      const icones = {agua:'💧', fralda:'🧷', alimentacao:'🍽️', katz:'📋', higiene:'🛁', decubito:'🔄', anotacao:'📝', vitais:'❤️', evolucao:'📔', curativo:'🩹', evacuacao:'🚽', diurese:'💛', mobilidade:'🚶', pele:'🧴', comportamento:'🧠', dor:'😖'};
+      const icones = {agua:'💧', fralda:'🧷', alimentacao:'🍽️', katz:'📋', higiene:'🛁', decubito:'🔄', anotacao:'📝', vitais:'❤️', evolucao:'📔', curativo:'🩹', evacuacao:'🚽', diurese:'💛', mobilidade:'🚶', pele:'🧴', comportamento:'🧠', dor:'😖', intercorrencia:'🚨'};
       el.innerHTML = itens.map(r=>{
         const d = r.data_hora ? new Date(r.data_hora) : null;
         const dstr = d ? d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+' às '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) : '';
@@ -2232,6 +2366,8 @@
     else if((m = apósPrefixo(hash, 'morador-editar-')) !== null) telaMoradorEditar(m);
     else if((m = apósPrefixo(hash, 'medicacoes-')) !== null) telaMedicacoes(m);
     else if((m = apósPrefixo(hash, 'administrar-')) !== null) telaAdministrarMedicamento(m);
+    else if((m = apósPrefixo(hash, 'registrar-intercorrencia-')) !== null) telaRegistrarIntercorrencia(m);
+    else if(hash === 'intercorrencias') telaIntercorrencias();
     else if((m = apósPrefixo(hash, 'morador-')) !== null) telaMoradorFicha(m);
     else if(SETORES[hash]) { if(garantirAcessoSetor(hash)) telaSetor(hash); }
     else telaInicio();
