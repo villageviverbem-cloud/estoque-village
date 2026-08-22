@@ -220,7 +220,7 @@
   function atualizarSidebarAtiva(hashAtual){
     let grupo = hashAtual;
     if(hashAtual.indexOf('leitor-') === 0){ /* mantém o hash completo, casa com o sub-item */ }
-    else if(hashAtual.indexOf('morador') === 0 || ['registrar-agua-','registrar-fralda-','registrar-higiene-','registrar-decubito-','registrar-curativo-','registrar-evacuacao-','registrar-diurese-','registrar-mobilidade-','registrar-pele-','registrar-comportamento-','registrar-dor-','registrar-alimentacao-','registrar-intercorrencia-','anotacao-','vitais-','evolucao-','katz-','editar-katz-','medicacoes-','administrar-'].some(p=>hashAtual.indexOf(p)===0)) grupo = 'moradores';
+    else if(hashAtual.indexOf('morador') === 0 || ['registrar-agua-','registrar-fralda-','registrar-higiene-','registrar-decubito-','registrar-curativo-','registrar-evacuacao-','registrar-diurese-','registrar-mobilidade-','registrar-pele-','registrar-comportamento-','registrar-dor-','registrar-alimentacao-','registrar-intercorrencia-','anotacao-','vitais-','evolucao-','katz-','editar-katz-','lawton-','editar-lawton-','medicacoes-','administrar-'].some(p=>hashAtual.indexOf(p)===0)) grupo = 'moradores';
     else if(hashAtual.indexOf('funcionarios') === 0) grupo = 'funcionarios';
     document.querySelectorAll('#sidebar [data-hash]').forEach(a=>{
       a.classList.toggle('ativo', a.dataset.hash === grupo);
@@ -1545,7 +1545,8 @@
         {chave:'anotacao', hashBase:'anotacao', editavel:false, ico:'📝', bg:'#f0f0f0', cor:'#607080', nome:'Anotação livre', desc:'Escrever uma observação'},
         {chave:'vitais', hashBase:'vitais', editavel:false, ico:'❤️', bg:'#fdecec', cor:'#c85a5a', nome:'Sinais Vitais', desc:'Registrar pressão, temperatura etc.'},
         {chave:'evolucao', hashBase:'evolucao', editavel:false, ico:'📔', bg:'#fef2e8', cor:'#c77b3b', nome:'Evolução Diária', desc:'Registrar evolução do turno'},
-        {chave:'katz', hashBase:'katz', editavel:true, ico:'📋', bg:'#f0ecfb', cor:'#7a5fb0', nome:'Escala de Katz', desc:'Avaliação de dependência (AVDs)'}
+        {chave:'katz', hashBase:'katz', editavel:true, ico:'📋', bg:'#f0ecfb', cor:'#7a5fb0', nome:'Escala de Katz', desc:'Avaliação de dependência (AVDs)'},
+        {chave:'lawton', hashBase:'lawton', editavel:true, ico:'📈', bg:'#f0ecfb', cor:'#7a5fb0', nome:'Escala de Lawton', desc:'Atividades instrumentais de vida diária (AIVDs)'}
       ];
       area.innerHTML = `
         <div class="opcoes">
@@ -1829,12 +1830,13 @@
 
   async function carregarHistoricoCuidado(id, token){
     try{
-      const [regsResult, katzResult, vitaisResult, evolucaoResult, intercResult] = await Promise.allSettled([
+      const [regsResult, katzResult, vitaisResult, evolucaoResult, intercResult, lawtonResult] = await Promise.allSettled([
         api('registros_cuidado?select=*&morador_id=eq.'+encodeURIComponent(id)+'&order=data_hora.desc&limit=15'),
         api('avaliacoes_katz?select=*&morador_id=eq.'+encodeURIComponent(id)+'&order=data_hora.desc&limit=15'),
         api('sinais_vitais?select=*&morador_id=eq.'+encodeURIComponent(id)+'&order=data_hora.desc&limit=15'),
         api('evolucoes_diarias?select=*&morador_id=eq.'+encodeURIComponent(id)+'&order=data_hora.desc&limit=15'),
-        api('intercorrencias?select=*&morador_id=eq.'+encodeURIComponent(id)+'&order=data_hora.desc&limit=15')
+        api('intercorrencias?select=*&morador_id=eq.'+encodeURIComponent(id)+'&order=data_hora.desc&limit=15'),
+        api('avaliacoes_lawton?select=*&morador_id=eq.'+encodeURIComponent(id)+'&order=data_hora.desc&limit=15')
       ]);
       // Cada tabela é buscada de forma independente: se uma ainda não existir
       // (ex: alguma tabela nova não criada ainda), as outras continuam aparecendo normal.
@@ -1843,6 +1845,7 @@
       const vitais = vitaisResult.status === 'fulfilled' ? vitaisResult.value : [];
       const evolucao = evolucaoResult.status === 'fulfilled' ? evolucaoResult.value : [];
       const interc = intercResult.status === 'fulfilled' ? intercResult.value : [];
+      const lawton = lawtonResult.status === 'fulfilled' ? lawtonResult.value : [];
       if(token !== viewToken) return;
       const el = document.getElementById('mf-historico');
       if(!el) return;
@@ -1851,10 +1854,11 @@
         ...katz.map(k => ({tipo: 'katz', valor: 'Escala de Katz — ' + (k.classificacao||'') + ' (' + (k.escore_total ?? '—') + '/6)', quem: k.avaliador, data_hora: k.data_hora})),
         ...vitais.map(v => ({tipo: 'vitais', valor: 'Sinais vitais — PA ' + (v.pa_sistolica ?? '—') + '/' + (v.pa_diastolica ?? '—') + (v.alertas ? ' ⚠️ ' + v.alertas : ''), quem: v.funcionario_nome, data_hora: v.data_hora})),
         ...evolucao.map(e => ({tipo: 'evolucao', valor: 'Evolução — ' + (e.turno || 'turno não informado'), quem: e.funcionario_nome, data_hora: e.data_hora})),
-        ...interc.map(i => ({tipo: 'intercorrencia', valor: '🚨 ' + (i.tipo||'Intercorrência') + ' (' + (i.gravidade||'—') + ') — ' + (i.status||'aberta'), quem: i.reportado_por, data_hora: i.data_hora}))
+        ...interc.map(i => ({tipo: 'intercorrencia', valor: '🚨 ' + (i.tipo||'Intercorrência') + ' (' + (i.gravidade||'—') + ') — ' + (i.status||'aberta'), quem: i.reportado_por, data_hora: i.data_hora})),
+        ...lawton.map(l => ({tipo: 'lawton', valor: 'Escala de Lawton — ' + (l.classificacao||'') + ' (' + (l.escore_total ?? '—') + '/8)', quem: l.avaliador, data_hora: l.data_hora}))
       ].sort((a,b) => new Date(b.data_hora) - new Date(a.data_hora)).slice(0, 15);
       if(!itens.length){ el.innerHTML = '<div class="estado">Nenhum registro ainda.</div>'; return; }
-      const icones = {agua:'💧', fralda:'🧷', alimentacao:'🍽️', katz:'📋', higiene:'🛁', decubito:'🔄', anotacao:'📝', vitais:'❤️', evolucao:'📔', curativo:'🩹', evacuacao:'🚽', diurese:'💛', mobilidade:'🚶', pele:'🧴', comportamento:'🧠', dor:'😖', intercorrencia:'🚨'};
+      const icones = {agua:'💧', fralda:'🧷', alimentacao:'🍽️', katz:'📋', higiene:'🛁', decubito:'🔄', anotacao:'📝', vitais:'❤️', evolucao:'📔', curativo:'🩹', evacuacao:'🚽', diurese:'💛', mobilidade:'🚶', pele:'🧴', comportamento:'🧠', dor:'😖', intercorrencia:'🚨', lawton:'📈'};
       el.innerHTML = itens.map(r=>{
         const d = r.data_hora ? new Date(r.data_hora) : null;
         const dstr = d ? d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+' às '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) : '';
@@ -2432,6 +2436,170 @@
     }
   }
 
+  // ---------- ESCALA DE LAWTON (AIVDs) ----------
+  const LAWTON_ITENS = [
+    {chave:'telefone', label:'Uso do telefone',
+      texto1:'Usa o telefone por iniciativa própria: procura números e disca sozinho',
+      texto0:'É incapaz de usar o telefone, ou só atende chamadas sem discar sozinho'},
+    {chave:'compras', label:'Fazer compras',
+      texto1:'Faz sozinho as compras necessárias',
+      texto0:'Precisa de acompanhamento pra qualquer compra, ou é incapaz de comprar'},
+    {chave:'preparo_refeicoes', label:'Preparo de refeições',
+      texto1:'Planeja, prepara e serve refeições adequadas sozinho',
+      texto0:'Precisa que preparem e sirvam a refeição pra ele/ela'},
+    {chave:'cuidado_casa', label:'Cuidado da casa',
+      texto1:'Mantém a casa sozinho, ou com ajuda ocasional só pra tarefas pesadas',
+      texto0:'Precisa de ajuda em todas as tarefas domésticas, ou não participa delas'},
+    {chave:'lavagem_roupa', label:'Lavagem de roupa',
+      texto1:'Lava a própria roupa completamente',
+      texto0:'Precisa que lavem a roupa pra ele/ela'},
+    {chave:'transporte', label:'Meio de transporte',
+      texto1:'Viaja sozinho em transporte público, táxi/app ou dirige o próprio carro',
+      texto0:'Só viaja acompanhado, ou não viaja de jeito nenhum'},
+    {chave:'medicacao', label:'Responsabilidade sobre a medicação',
+      texto1:'Toma os remédios na dose e horário certos, por conta própria',
+      texto0:'Precisa que preparem/lembrem a medicação, ou não é capaz de tomar sozinho'},
+    {chave:'financas', label:'Capacidade de lidar com finanças',
+      texto1:'Cuida das próprias finanças (contas, banco etc.)',
+      texto0:'Precisa de ajuda pra lidar com dinheiro, ou é incapaz'}
+  ];
+  let lawtonRespostas = {};
+  let lawtonEditandoId = null;
+
+  function classificarLawton(escore){
+    if(escore === 8) return 'Independente';
+    if(escore >= 4) return 'Dependência parcial';
+    return 'Dependência importante';
+  }
+
+  function telaLawton(moradorId, editar){
+    const hashAtual = (editar ? 'editar-lawton-' : 'lawton-') + moradorId;
+    if(!exigirFuncionario(hashAtual)) return;
+    lawtonRespostas = {};
+    lawtonEditandoId = null;
+    app.innerHTML = `
+      <div class="topo" style="background:linear-gradient(120deg,#9070c0,#7a5fb0)">
+        <button class="voltar" id="btn-voltar-morador">← Voltar</button>
+        <h1>📈 Escala de Lawton</h1>
+        <p>${editar ? 'Editando a última avaliação' : 'Atividades instrumentais de vida diária (AIVDs)'}</p>
+      </div>
+      ${bannerFuncionario(hashAtual)}
+      <div class="wrap">
+        ${LAWTON_ITENS.map(it => `
+          <div style="font-size:15px;font-weight:700;color:var(--teal-esc);margin:16px 0 8px">${esc(it.label)}</div>
+          <div id="lawton-${it.chave}">
+            <div class="chip chip-full" data-valor="1"><span class="chip-full-texto">${esc(it.texto1)}</span><span class="katz-pts">1</span></div>
+            <div class="chip chip-full" data-valor="0"><span class="chip-full-texto">${esc(it.texto0)}</span><span class="katz-pts">0</span></div>
+          </div>
+        `).join('')}
+        <div style="display:flex;justify-content:space-between;align-items:center;margin:20px 0 6px">
+          <div style="font-size:14px;font-weight:700;color:var(--teal-esc)">Escore total</div>
+          <div id="lawton-escore" style="font-size:26px;font-weight:800;color:var(--teal)">0</div>
+        </div>
+        <div id="lawton-classificacao" style="text-align:center;font-size:13px;color:var(--muted);margin-bottom:14px">Responda todos os itens</div>
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:8px 0 4px">Observações (opcional)</label>
+        <textarea id="lawton-obs" rows="2" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px"></textarea>
+        <button id="lawton-salvar" style="width:100%;background:#7a5fb0;color:#fff;border:none;border-radius:14px;padding:14px;font-size:15px;font-weight:700;margin-top:14px">${editar ? 'Salvar alteração' : 'Salvar avaliação'}</button>
+        <div id="lawton-msg" style="text-align:center;font-size:12.5px;color:var(--muted);margin-top:10px"></div>
+      </div>
+    `;
+    document.getElementById('btn-voltar-morador').addEventListener('click', () => { location.hash = 'morador-' + moradorId; });
+    LAWTON_ITENS.forEach(it => {
+      ligarChips('lawton-' + it.chave, v => { lawtonRespostas[it.chave] = Number(v); atualizarEscoreLawton(); });
+    });
+    document.getElementById('lawton-salvar').addEventListener('click', () => salvarLawton(moradorId));
+    if(editar){
+      const btnSalvar = document.getElementById('lawton-salvar');
+      if(btnSalvar) btnSalvar.disabled = true;
+      carregarUltimoLawton(moradorId);
+    }
+  }
+
+  async function carregarUltimoLawton(moradorId){
+    const token = viewToken;
+    const msg = document.getElementById('lawton-msg');
+    try{
+      const rows = await api('avaliacoes_lawton?select=*&morador_id=eq.'+encodeURIComponent(moradorId)+'&order=data_hora.desc&limit=1');
+      if(token !== viewToken) return;
+      if(!rows.length){
+        if(msg) msg.textContent = 'Nenhuma avaliação anterior ainda — isso vai criar uma nova.';
+        return;
+      }
+      const r = rows[0];
+      lawtonEditandoId = r.id;
+      LAWTON_ITENS.forEach(it => {
+        const valor = r[it.chave];
+        if(valor === null || valor === undefined) return;
+        lawtonRespostas[it.chave] = Number(valor);
+        const cont = document.getElementById('lawton-' + it.chave);
+        if(cont){
+          cont.querySelectorAll('.chip').forEach(c => {
+            c.classList.toggle('sel', Number(c.dataset.valor) === Number(valor));
+          });
+        }
+      });
+      atualizarEscoreLawton();
+      const obsEl = document.getElementById('lawton-obs');
+      if(obsEl) obsEl.value = r.observacoes || '';
+    }catch(e){
+      if(token !== viewToken) return;
+      if(msg) msg.textContent = '⚠️ Não consegui carregar a avaliação anterior: ' + esc(e.message);
+    }finally{
+      if(token === viewToken){
+        const btnSalvar = document.getElementById('lawton-salvar');
+        if(btnSalvar) btnSalvar.disabled = false;
+      }
+    }
+  }
+
+  function atualizarEscoreLawton(){
+    const valores = LAWTON_ITENS.map(it => lawtonRespostas[it.chave]);
+    const respondidos = valores.filter(v => v !== undefined);
+    const escore = respondidos.reduce((s,v) => s+v, 0);
+    document.getElementById('lawton-escore').textContent = escore;
+    const classEl = document.getElementById('lawton-classificacao');
+    if(respondidos.length < LAWTON_ITENS.length){
+      classEl.textContent = 'Faltam ' + (LAWTON_ITENS.length - respondidos.length) + ' item(ns)';
+      return;
+    }
+    classEl.textContent = 'Classificação: ' + classificarLawton(escore);
+  }
+
+  async function salvarLawton(moradorId){
+    const msg = document.getElementById('lawton-msg');
+    const valores = LAWTON_ITENS.map(it => lawtonRespostas[it.chave]);
+    if(valores.some(v => v === undefined)){ msg.textContent = 'Responda todos os itens antes de salvar.'; return; }
+    const f = funcionarioAtual();
+    if(!f){ location.hash = 'funcionarios?v=' + encodeURIComponent((lawtonEditandoId?'editar-lawton-':'lawton-')+moradorId); return; }
+    const escore = valores.reduce((s,v) => s+v, 0);
+    const classificacao = classificarLawton(escore);
+    const obs = document.getElementById('lawton-obs').value.trim();
+    msg.textContent = 'Salvando...';
+    const btn = document.getElementById('lawton-salvar');
+    if(btn) btn.disabled = true;
+    try{
+      const respostas = {};
+      LAWTON_ITENS.forEach(it => { respostas[it.chave] = lawtonRespostas[it.chave]; });
+      respostas.escore_total = escore;
+      respostas.classificacao = classificacao;
+      respostas.observacoes = obs || null;
+      if(lawtonEditandoId){
+        await apiWrite('avaliacoes_lawton?id=eq.'+encodeURIComponent(lawtonEditandoId), 'PATCH', respostas);
+      }else{
+        const moradorNome = await nomeDoMorador(moradorId);
+        await apiWrite('avaliacoes_lawton', 'POST', {
+          morador_id: moradorId, morador_nome: moradorNome, avaliador: f.nome,
+          data_hora: new Date().toISOString(), ...respostas
+        });
+      }
+      location.hash = 'morador-' + moradorId;
+    }catch(e){
+      msg.textContent = '⚠️ Erro: ' + esc(e.message) + '. Se a tabela "avaliacoes_lawton" não existe, rode o SQL que te mandei.';
+    }finally{
+      if(btn) btn.disabled = false;
+    }
+  }
+
   // ---------- ROTEADOR ----------
   let viewToken = 0;
   function apósPrefixo(hash, prefixo){
@@ -2467,6 +2635,8 @@
     else if((m = apósPrefixo(hash, 'vitais-')) !== null) telaVitais(m);
     else if((m = apósPrefixo(hash, 'evolucao-')) !== null) telaEvolucao(m);
     else if((m = apósPrefixo(hash, 'katz-')) !== null) telaKatz(m);
+    else if((m = apósPrefixo(hash, 'editar-lawton-')) !== null) telaLawton(m, true);
+    else if((m = apósPrefixo(hash, 'lawton-')) !== null) telaLawton(m);
     else if(hash === 'morador-novo') telaMoradorNovo();
     else if((m = apósPrefixo(hash, 'morador-editar-')) !== null) telaMoradorEditar(m);
     else if((m = apósPrefixo(hash, 'medicacoes-')) !== null) telaMedicacoes(m);
