@@ -150,6 +150,7 @@
   <nav id="sidebar">
     <div class="sb-logo">🌳 Village Viver Bem</div>
     <a class="sb-link" data-hash="inicio" href="#inicio"><span class="ico">🏠</span>Início</a>
+    <a class="sb-link" id="sb-painel" href="#"><span class="ico">📊</span>Visão Geral</a>
     <a class="sb-link" data-hash="farmacia" href="#farmacia"><span class="ico">💊</span>Farmácia</a>
     <a class="sb-sub" data-hash="leitor-farmacia" href="#leitor-farmacia"><span class="ico">📷</span>Leitor rápido</a>
     <a class="sb-sub" data-hash="medicamentos" id="sb-medicamentos" href="#"><span class="ico">💊</span>Medicamentos</a>
@@ -185,6 +186,7 @@
 
   // ==== App financeiro (DRE, folha, contas a pagar etc.) — sistema próprio, hospedado à parte ====
   const APP_FINANCEIRO = 'https://villageviverbem-cloud.github.io/Village-Financeiro/';
+  const PAINEL_URL = 'painel.html';
   // Moradores e Equipe são abertos direto do menu do ILPI, na mesma aba, então o
   // "Voltar" delas leva de volta pro ILPI em vez de para o início deste app.
   const ILPI_URL = 'https://eduardonoronha9.app.n8n.cloud/webhook/ilpi';
@@ -205,6 +207,7 @@
 
   // ---------- BARRA LATERAL ----------
   document.getElementById('sb-financeiro').addEventListener('click', function(e){ e.preventDefault(); irExterno('financeiro', APP_FINANCEIRO); });
+  document.getElementById('sb-painel').addEventListener('click', function(e){ e.preventDefault(); irExterno('painel', PAINEL_URL); });
   document.getElementById('sb-medicamentos').addEventListener('click', function(e){ e.preventDefault(); irExterno('farmacia', FARMACIA_MEDICAMENTOS_URL); });
   function toggleSidebar(forcar){
     const layout = document.getElementById('layout');
@@ -324,6 +327,11 @@
       </div>
       <div class="saudacao">Olá! 👋<span>Escolha o setor que deseja acessar</span></div>
       <div class="grade">
+        <a class="pasta destaque" href="#" onclick="irExterno('painel', PAINEL_URL); return false;" style="background:linear-gradient(120deg,var(--teal),var(--verde))">
+          <div class="seta">→</div><div class="ico">📊</div>
+          <div class="nome">Visão Geral</div>
+          <div class="desc">Indicadores, alertas e todos os moradores numa tela só, sem entrar em cada um</div>
+        </a>
         <a class="pasta destaque" href="#farmacia">
           <div class="seta">→</div><div class="ico">💊</div>
           <div class="nome">Farmácia</div>
@@ -1483,7 +1491,7 @@
         ...evolucao.map(e => ({tipo: 'evolucao', valor: 'Evolução — ' + (e.turno || 'turno não informado'), quem: e.funcionario_nome, data_hora: e.data_hora}))
       ].sort((a,b) => new Date(b.data_hora) - new Date(a.data_hora)).slice(0, 15);
       if(!itens.length){ el.innerHTML = '<div class="estado">Nenhum registro ainda.</div>'; return; }
-      const icones = {agua:'💧', fralda:'🧷', alimentacao:'🍽️', katz:'📋', higiene:'🛁', decubito:'🔄', anotacao:'📝', vitais:'❤️', evolucao:'📔'};
+      const icones = {agua:'💧', fralda:'🧷', alimentacao:'🍽️', katz:'📋', higiene:'🛁', decubito:'🔄', anotacao:'📝', vitais:'❤️', evolucao:'📔', curativo:'🩹', evacuacao:'🚽', diurese:'💛', mobilidade:'🚶', pele:'🧴', comportamento:'🧠', dor:'😖'};
       el.innerHTML = itens.map(r=>{
         const d = r.data_hora ? new Date(r.data_hora) : null;
         const dstr = d ? d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+' às '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) : '';
@@ -1503,26 +1511,10 @@
   }
 
   // ---------- REGISTROS RÁPIDOS: ÁGUA E FRALDA ----------
-  // A partir daqui, os registros de cuidado NÃO gravam mais numa tabela nossa —
-  // eles enviam direto pro Prontuário do Residente que já existe (mesmo link,
-  // mesmos campos que o formulário antigo já usava), então caem no mesmo lugar
-  // de sempre e os contadores/checklist do Prontuário continuam funcionando.
-  const ILPI_HISTORICO_URL = 'https://eduardonoronha9.app.n8n.cloud/webhook/ilpi-historico';
-
-  function construirUrlCuidado(params){
-    // Manda todo campo, mesmo vazio (só pula null/undefined) — igual um <input> de
-    // formulário normal sempre envia seu valor, mesmo que esteja em branco.
-    const usp = new URLSearchParams();
-    Object.keys(params).forEach(k => {
-      if(params[k] !== null && params[k] !== undefined) usp.set(k, params[k]);
-    });
-    return ILPI_HISTORICO_URL + '?' + usp.toString();
-  }
-
   const CUIDADO_CONFIG = {
     agua: {
       titulo: '💧 Bebeu água / Hidratação', cor: '#4a6fa5',
-      pergunta: 'Quantos copos? (1 copo = 200 ml)', careType: 'Hidratação', comoCopos: true,
+      pergunta: 'Quantos copos? (1 copo = 200 ml)',
       opcoes: [
         {label:'1 copo (200 ml)', valor:'1'}, {label:'2 copos (400 ml)', valor:'2'},
         {label:'3 copos (600 ml)', valor:'3'}, {label:'4 copos (800 ml)', valor:'4'},
@@ -1531,52 +1523,52 @@
     },
     fralda: {
       titulo: '🧷 Checar / Trocar fralda', cor: '#c85a5a',
-      pergunta: 'Situação', careType: 'Fralda',
+      pergunta: 'Situação',
       opcoes: ['Seca - sem troca','Trocada - urina','Trocada - fezes','Trocada - urina e fezes'].map(v=>({label:v, valor:v}))
     },
     higiene: {
       titulo: '🛁 Higiene / Banho', cor: '#2f6f6e',
-      pergunta: 'Tipo', careType: 'Higiene',
+      pergunta: 'Tipo',
       opcoes: ['Banho completo','Higiene íntima','Higiene oral','Troca de roupa de cama'].map(v=>({label:v, valor:v}))
     },
     decubito: {
       titulo: '🔄 Mudança de decúbito', cor: '#4a6fa5',
-      pergunta: 'Posição', careType: 'Mudança de decúbito',
+      pergunta: 'Posição',
       opcoes: ['Decúbito dorsal','Decúbito lateral direito','Decúbito lateral esquerdo','Sentado / poltrona'].map(v=>({label:v, valor:v}))
     },
     curativo: {
       titulo: '🩹 Curativo', cor: '#c77b3b',
-      pergunta: 'Situação', careType: 'Curativo',
+      pergunta: 'Situação',
       opcoes: ['Realizado','Não realizado','Recusado pelo residente'].map(v=>({label:v, valor:v}))
     },
     evacuacao: {
       titulo: '🚽 Evacuação', cor: '#2f6f6e',
-      pergunta: 'Situação', careType: 'Evacuação',
+      pergunta: 'Situação',
       opcoes: ['Evacuou - normal','Evacuou - alterada','Não evacuou'].map(v=>({label:v, valor:v}))
     },
     diurese: {
       titulo: '💛 Diurese', cor: '#c9a227',
-      pergunta: 'Situação', careType: 'Diurese',
+      pergunta: 'Situação',
       opcoes: ['Normal','Alterada','Ausente'].map(v=>({label:v, valor:v}))
     },
     mobilidade: {
       titulo: '🚶 Mobilidade', cor: '#4a6fa5',
-      pergunta: 'Situação', careType: 'Mobilidade',
+      pergunta: 'Situação',
       opcoes: ['Deambulando','Com auxílio','Cadeira de rodas','Acamado'].map(v=>({label:v, valor:v}))
     },
     pele: {
       titulo: '🧴 Pele', cor: '#c85a5a',
-      pergunta: 'Situação', careType: 'Pele',
+      pergunta: 'Situação',
       opcoes: ['Íntegra - sem alterações','Com alteração (descrever na observação)'].map(v=>({label:v, valor:v}))
     },
     comportamento: {
       titulo: '🧠 Comportamento', cor: '#7a5fb0',
-      pergunta: 'Situação', careType: 'Comportamento',
+      pergunta: 'Situação',
       opcoes: ['Calmo(a)','Agitado(a)','Confuso(a)','Sonolento(a)'].map(v=>({label:v, valor:v}))
     },
     dor: {
       titulo: '😖 Dor', cor: '#c0392b',
-      pergunta: 'Situação', careType: 'Dor',
+      pergunta: 'Situação',
       opcoes: ['Sem dor','Dor leve','Dor moderada','Dor intensa'].map(v=>({label:v, valor:v}))
     }
   };
@@ -1616,19 +1608,21 @@
     if(!f){ location.hash = 'funcionarios?v=' + encodeURIComponent('registrar-'+tipo+'-'+moradorId); return; }
     const obs = document.getElementById('cd-obs').value.trim();
     const cfg = CUIDADO_CONFIG[tipo];
-    msg.textContent = 'Enviando pro prontuário...';
+    msg.textContent = 'Salvando...';
     const btn = document.getElementById('cd-salvar');
     if(btn) btn.disabled = true;
     try{
       const moradorNome = await nomeDoMorador(moradorId);
-      const params = {
-        action: 'care', resident: moradorNome, back_tab: 'acoes',
-        care_type: cfg.careType, recorded_by: f.nome, notes: obs
-      };
-      if(cfg.comoCopos) params.copos = cuidadoSelecionado; else params.detail = cuidadoSelecionado;
-      location.href = construirUrlCuidado(params);
+      const opcao = cfg.opcoes.find(o => o.valor === cuidadoSelecionado);
+      const valor = opcao ? opcao.label : cuidadoSelecionado;
+      await apiWrite('registros_cuidado', 'POST', {
+        morador_id: moradorId, morador_nome: moradorNome, tipo, valor,
+        observacao: obs || null, funcionario_id: f.id, funcionario_nome: f.nome,
+        data_hora: new Date().toISOString()
+      });
+      location.hash = 'morador-' + moradorId;
     }catch(e){
-      msg.textContent = '⚠️ Erro: ' + esc(e.message) + '.';
+      msg.textContent = '⚠️ Erro: ' + esc(e.message) + '. Se a tabela "registros_cuidado" não existe, rode o SQL que te mandei.';
       if(btn) btn.disabled = false;
     }
   }
@@ -1681,16 +1675,19 @@
     const f = funcionarioAtual();
     if(!f){ location.hash = 'funcionarios?v=' + encodeURIComponent('registrar-alimentacao-'+moradorId); return; }
     const obs = document.getElementById('cd-obs').value.trim();
-    msg.textContent = 'Enviando pro prontuário...';
+    msg.textContent = 'Salvando...';
     const btn = document.getElementById('cd-salvar');
     if(btn) btn.disabled = true;
     try{
       const moradorNome = await nomeDoMorador(moradorId);
-      const detail = alimentacaoRefeicao + ' - ' + alimentacaoAceitacao;
-      location.href = construirUrlCuidado({
-        action: 'care', resident: moradorNome, back_tab: 'acoes',
-        care_type: 'Alimentação', detail, recorded_by: f.nome, notes: obs
+      const aceitacaoLabel = (ALIMENTACAO_ACEITACAO.find(o => o.valor === alimentacaoAceitacao) || {}).label || alimentacaoAceitacao;
+      const valor = alimentacaoRefeicao + ' - ' + aceitacaoLabel;
+      await apiWrite('registros_cuidado', 'POST', {
+        morador_id: moradorId, morador_nome: moradorNome, tipo: 'alimentacao', valor,
+        observacao: obs || null, funcionario_id: f.id, funcionario_nome: f.nome,
+        data_hora: new Date().toISOString()
       });
+      location.hash = 'morador-' + moradorId;
     }catch(e){
       msg.textContent = '⚠️ Erro: ' + esc(e.message) + '.';
       if(btn) btn.disabled = false;
@@ -1724,15 +1721,16 @@
     if(!texto){ msg.textContent = 'Escreva alguma coisa antes de salvar.'; return; }
     const f = funcionarioAtual();
     if(!f){ location.hash = 'funcionarios?v=' + encodeURIComponent('anotacao-'+moradorId); return; }
-    msg.textContent = 'Enviando pro prontuário...';
+    msg.textContent = 'Salvando...';
     const btn = document.getElementById('an-salvar');
     if(btn) btn.disabled = true;
     try{
       const moradorNome = await nomeDoMorador(moradorId);
-      location.href = construirUrlCuidado({
-        action: 'care', resident: moradorNome, back_tab: 'acoes',
-        care_type: 'Observação', notes: texto, recorded_by: f.nome
+      await apiWrite('registros_cuidado', 'POST', {
+        morador_id: moradorId, morador_nome: moradorNome, tipo: 'anotacao', valor: texto,
+        funcionario_id: f.id, funcionario_nome: f.nome, data_hora: new Date().toISOString()
       });
+      location.hash = 'morador-' + moradorId;
     }catch(e){
       msg.textContent = '⚠️ Erro: ' + esc(e.message) + '.';
       if(btn) btn.disabled = false;
