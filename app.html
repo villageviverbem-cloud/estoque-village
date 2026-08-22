@@ -1421,6 +1421,12 @@
         {chave:'higiene', hashBase:'registrar-higiene', editavel:false, ico:'🛁', bg:'#e8f4f4', cor:'#2f6f6e', nome:'Higiene / Banho', desc:'Registrar tipo de banho/higiene'},
         {chave:'decubito', hashBase:'registrar-decubito', editavel:false, ico:'🔄', bg:'#eaf1fb', cor:'#4a6fa5', nome:'Mudança de decúbito', desc:'Registrar posição'},
         {chave:'curativo', hashBase:'registrar-curativo', editavel:false, ico:'🩹', bg:'#fef2e8', cor:'#c77b3b', nome:'Curativo', desc:'Registrar troca/checagem de curativo'},
+        {chave:'evacuacao', hashBase:'registrar-evacuacao', editavel:false, ico:'🚽', bg:'#e8f4f4', cor:'#2f6f6e', nome:'Evacuação', desc:'Registrar evacuação'},
+        {chave:'diurese', hashBase:'registrar-diurese', editavel:false, ico:'💛', bg:'#fbf6e3', cor:'#c9a227', nome:'Diurese', desc:'Registrar diurese'},
+        {chave:'mobilidade', hashBase:'registrar-mobilidade', editavel:false, ico:'🚶', bg:'#eaf1fb', cor:'#4a6fa5', nome:'Mobilidade', desc:'Registrar mobilidade/deambulação'},
+        {chave:'pele', hashBase:'registrar-pele', editavel:false, ico:'🧴', bg:'#fdecec', cor:'#c85a5a', nome:'Pele', desc:'Registrar condição da pele'},
+        {chave:'comportamento', hashBase:'registrar-comportamento', editavel:false, ico:'🧠', bg:'#f0ecfb', cor:'#7a5fb0', nome:'Comportamento', desc:'Registrar comportamento/humor'},
+        {chave:'dor', hashBase:'registrar-dor', editavel:false, ico:'😖', bg:'#fdecec', cor:'#c0392b', nome:'Dor', desc:'Registrar nível de dor'},
         {chave:'anotacao', hashBase:'anotacao', editavel:false, ico:'📝', bg:'#f0f0f0', cor:'#607080', nome:'Anotação livre', desc:'Escrever uma observação'},
         {chave:'vitais', hashBase:'vitais', editavel:false, ico:'❤️', bg:'#fdecec', cor:'#c85a5a', nome:'Sinais Vitais', desc:'Registrar pressão, temperatura etc.'},
         {chave:'evolucao', hashBase:'evolucao', editavel:false, ico:'📔', bg:'#fef2e8', cor:'#c77b3b', nome:'Evolução Diária', desc:'Registrar evolução do turno'},
@@ -1542,6 +1548,36 @@
       titulo: '🩹 Curativo', cor: '#c77b3b',
       pergunta: 'Situação', careType: 'Curativo',
       opcoes: ['Realizado','Não realizado','Recusado pelo residente'].map(v=>({label:v, valor:v}))
+    },
+    evacuacao: {
+      titulo: '🚽 Evacuação', cor: '#2f6f6e',
+      pergunta: 'Situação', careType: 'Evacuação',
+      opcoes: ['Evacuou - normal','Evacuou - alterada','Não evacuou'].map(v=>({label:v, valor:v}))
+    },
+    diurese: {
+      titulo: '💛 Diurese', cor: '#c9a227',
+      pergunta: 'Situação', careType: 'Diurese',
+      opcoes: ['Normal','Alterada','Ausente'].map(v=>({label:v, valor:v}))
+    },
+    mobilidade: {
+      titulo: '🚶 Mobilidade', cor: '#4a6fa5',
+      pergunta: 'Situação', careType: 'Mobilidade',
+      opcoes: ['Deambulando','Com auxílio','Cadeira de rodas','Acamado'].map(v=>({label:v, valor:v}))
+    },
+    pele: {
+      titulo: '🧴 Pele', cor: '#c85a5a',
+      pergunta: 'Situação', careType: 'Pele',
+      opcoes: ['Íntegra - sem alterações','Com alteração (descrever na observação)'].map(v=>({label:v, valor:v}))
+    },
+    comportamento: {
+      titulo: '🧠 Comportamento', cor: '#7a5fb0',
+      pergunta: 'Situação', careType: 'Comportamento',
+      opcoes: ['Calmo(a)','Agitado(a)','Confuso(a)','Sonolento(a)'].map(v=>({label:v, valor:v}))
+    },
+    dor: {
+      titulo: '😖 Dor', cor: '#c0392b',
+      pergunta: 'Situação', careType: 'Dor',
+      opcoes: ['Sem dor','Dor leve','Dor moderada','Dor intensa'].map(v=>({label:v, valor:v}))
     }
   };
   let cuidadoSelecionado = null;
@@ -2059,6 +2095,12 @@
     else if((m = apósPrefixo(hash, 'registrar-higiene-')) !== null) telaRegistrarSimples('higiene', m);
     else if((m = apósPrefixo(hash, 'registrar-decubito-')) !== null) telaRegistrarSimples('decubito', m);
     else if((m = apósPrefixo(hash, 'registrar-curativo-')) !== null) telaRegistrarSimples('curativo', m);
+    else if((m = apósPrefixo(hash, 'registrar-evacuacao-')) !== null) telaRegistrarSimples('evacuacao', m);
+    else if((m = apósPrefixo(hash, 'registrar-diurese-')) !== null) telaRegistrarSimples('diurese', m);
+    else if((m = apósPrefixo(hash, 'registrar-mobilidade-')) !== null) telaRegistrarSimples('mobilidade', m);
+    else if((m = apósPrefixo(hash, 'registrar-pele-')) !== null) telaRegistrarSimples('pele', m);
+    else if((m = apósPrefixo(hash, 'registrar-comportamento-')) !== null) telaRegistrarSimples('comportamento', m);
+    else if((m = apósPrefixo(hash, 'registrar-dor-')) !== null) telaRegistrarSimples('dor', m);
     else if((m = apósPrefixo(hash, 'registrar-alimentacao-')) !== null) telaRegistrarAlimentacao(m);
     else if((m = apósPrefixo(hash, 'anotacao-')) !== null) telaAnotacao(m);
     else if((m = apósPrefixo(hash, 'vitais-')) !== null) telaVitais(m);
