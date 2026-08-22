@@ -150,6 +150,7 @@
   <nav id="sidebar">
     <div class="sb-logo">🌳 Village Viver Bem</div>
     <a class="sb-link" data-hash="inicio" href="#inicio"><span class="ico">🏠</span>Início</a>
+    <a class="sb-link" id="sb-painel" href="#"><span class="ico">📊</span>Visão Geral</a>
     <a class="sb-link" data-hash="farmacia" href="#farmacia"><span class="ico">💊</span>Farmácia</a>
     <a class="sb-sub" data-hash="leitor-farmacia" href="#leitor-farmacia"><span class="ico">📷</span>Leitor rápido</a>
     <a class="sb-sub" data-hash="medicamentos" id="sb-medicamentos" href="#"><span class="ico">💊</span>Medicamentos</a>
@@ -185,6 +186,7 @@
 
   // ==== App financeiro (DRE, folha, contas a pagar etc.) — sistema próprio, hospedado à parte ====
   const APP_FINANCEIRO = 'https://villageviverbem-cloud.github.io/Village-Financeiro/';
+  const PAINEL_URL = 'painel.html';
   // Moradores e Equipe são abertos direto do menu do ILPI, na mesma aba, então o
   // "Voltar" delas leva de volta pro ILPI em vez de para o início deste app.
   const ILPI_URL = 'https://eduardonoronha9.app.n8n.cloud/webhook/ilpi';
@@ -205,6 +207,7 @@
 
   // ---------- BARRA LATERAL ----------
   document.getElementById('sb-financeiro').addEventListener('click', function(e){ e.preventDefault(); irExterno('financeiro', APP_FINANCEIRO); });
+  document.getElementById('sb-painel').addEventListener('click', function(e){ e.preventDefault(); irExterno('painel', PAINEL_URL); });
   document.getElementById('sb-medicamentos').addEventListener('click', function(e){ e.preventDefault(); irExterno('farmacia', FARMACIA_MEDICAMENTOS_URL); });
   function toggleSidebar(forcar){
     const layout = document.getElementById('layout');
@@ -324,6 +327,11 @@
       </div>
       <div class="saudacao">Olá! 👋<span>Escolha o setor que deseja acessar</span></div>
       <div class="grade">
+        <a class="pasta destaque" href="#" onclick="irExterno('painel', PAINEL_URL); return false;" style="background:linear-gradient(120deg,var(--teal),var(--verde))">
+          <div class="seta">→</div><div class="ico">📊</div>
+          <div class="nome">Visão Geral</div>
+          <div class="desc">Indicadores, alertas e todos os moradores numa tela só, sem entrar em cada um</div>
+        </a>
         <a class="pasta destaque" href="#farmacia">
           <div class="seta">→</div><div class="ico">💊</div>
           <div class="nome">Farmácia</div>
