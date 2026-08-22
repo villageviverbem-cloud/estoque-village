@@ -220,7 +220,7 @@
   function atualizarSidebarAtiva(hashAtual){
     let grupo = hashAtual;
     if(hashAtual.indexOf('leitor-') === 0){ /* mantém o hash completo, casa com o sub-item */ }
-    else if(hashAtual.indexOf('morador') === 0 || ['registrar-agua-','registrar-fralda-','registrar-higiene-','registrar-decubito-','registrar-curativo-','registrar-evacuacao-','registrar-diurese-','registrar-mobilidade-','registrar-pele-','registrar-comportamento-','registrar-dor-','registrar-alimentacao-','registrar-intercorrencia-','anotacao-','vitais-','evolucao-','katz-','editar-katz-','lawton-','editar-lawton-','medicacoes-','administrar-'].some(p=>hashAtual.indexOf(p)===0)) grupo = 'moradores';
+    else if(hashAtual.indexOf('morador') === 0 || ['registrar-agua-','registrar-fralda-','registrar-higiene-','registrar-decubito-','registrar-curativo-','registrar-evacuacao-','registrar-diurese-','registrar-mobilidade-','registrar-pele-','registrar-comportamento-','registrar-dor-','registrar-alimentacao-','registrar-intercorrencia-','anotacao-','vitais-','evolucao-','katz-','editar-katz-','lawton-','editar-lawton-','sae-','medicacoes-','administrar-'].some(p=>hashAtual.indexOf(p)===0)) grupo = 'moradores';
     else if(hashAtual.indexOf('funcionarios') === 0) grupo = 'funcionarios';
     document.querySelectorAll('#sidebar [data-hash]').forEach(a=>{
       a.classList.toggle('ativo', a.dataset.hash === grupo);
@@ -1546,7 +1546,8 @@
         {chave:'vitais', hashBase:'vitais', editavel:false, ico:'❤️', bg:'#fdecec', cor:'#c85a5a', nome:'Sinais Vitais', desc:'Registrar pressão, temperatura etc.'},
         {chave:'evolucao', hashBase:'evolucao', editavel:false, ico:'📔', bg:'#fef2e8', cor:'#c77b3b', nome:'Evolução Diária', desc:'Registrar evolução do turno'},
         {chave:'katz', hashBase:'katz', editavel:true, ico:'📋', bg:'#f0ecfb', cor:'#7a5fb0', nome:'Escala de Katz', desc:'Avaliação de dependência (AVDs)'},
-        {chave:'lawton', hashBase:'lawton', editavel:true, ico:'📈', bg:'#f0ecfb', cor:'#7a5fb0', nome:'Escala de Lawton', desc:'Atividades instrumentais de vida diária (AIVDs)'}
+        {chave:'lawton', hashBase:'lawton', editavel:true, ico:'📈', bg:'#f0ecfb', cor:'#7a5fb0', nome:'Escala de Lawton', desc:'Atividades instrumentais de vida diária (AIVDs)'},
+        {chave:'sae', hashBase:'sae', editavel:false, ico:'🩺', bg:'#eaf7f0', cor:'#1a6b4a', nome:'Consulta de Enfermagem (SAE)', desc:'Exame físico e avaliação de enfermagem'}
       ];
       area.innerHTML = `
         <div class="opcoes">
@@ -1830,13 +1831,14 @@
 
   async function carregarHistoricoCuidado(id, token){
     try{
-      const [regsResult, katzResult, vitaisResult, evolucaoResult, intercResult, lawtonResult] = await Promise.allSettled([
+      const [regsResult, katzResult, vitaisResult, evolucaoResult, intercResult, lawtonResult, saeResult] = await Promise.allSettled([
         api('registros_cuidado?select=*&morador_id=eq.'+encodeURIComponent(id)+'&order=data_hora.desc&limit=15'),
         api('avaliacoes_katz?select=*&morador_id=eq.'+encodeURIComponent(id)+'&order=data_hora.desc&limit=15'),
         api('sinais_vitais?select=*&morador_id=eq.'+encodeURIComponent(id)+'&order=data_hora.desc&limit=15'),
         api('evolucoes_diarias?select=*&morador_id=eq.'+encodeURIComponent(id)+'&order=data_hora.desc&limit=15'),
         api('intercorrencias?select=*&morador_id=eq.'+encodeURIComponent(id)+'&order=data_hora.desc&limit=15'),
-        api('avaliacoes_lawton?select=*&morador_id=eq.'+encodeURIComponent(id)+'&order=data_hora.desc&limit=15')
+        api('avaliacoes_lawton?select=*&morador_id=eq.'+encodeURIComponent(id)+'&order=data_hora.desc&limit=15'),
+        api('consultas_enfermagem?select=*&morador_id=eq.'+encodeURIComponent(id)+'&order=data_hora.desc&limit=15')
       ]);
       // Cada tabela é buscada de forma independente: se uma ainda não existir
       // (ex: alguma tabela nova não criada ainda), as outras continuam aparecendo normal.
@@ -1846,6 +1848,7 @@
       const evolucao = evolucaoResult.status === 'fulfilled' ? evolucaoResult.value : [];
       const interc = intercResult.status === 'fulfilled' ? intercResult.value : [];
       const lawton = lawtonResult.status === 'fulfilled' ? lawtonResult.value : [];
+      const sae = saeResult.status === 'fulfilled' ? saeResult.value : [];
       if(token !== viewToken) return;
       const el = document.getElementById('mf-historico');
       if(!el) return;
@@ -1855,10 +1858,11 @@
         ...vitais.map(v => ({tipo: 'vitais', valor: 'Sinais vitais — PA ' + (v.pa_sistolica ?? '—') + '/' + (v.pa_diastolica ?? '—') + (v.alertas ? ' ⚠️ ' + v.alertas : ''), quem: v.funcionario_nome, data_hora: v.data_hora})),
         ...evolucao.map(e => ({tipo: 'evolucao', valor: 'Evolução — ' + (e.turno || 'turno não informado'), quem: e.funcionario_nome, data_hora: e.data_hora})),
         ...interc.map(i => ({tipo: 'intercorrencia', valor: '🚨 ' + (i.tipo||'Intercorrência') + ' (' + (i.gravidade||'—') + ') — ' + (i.status||'aberta'), quem: i.reportado_por, data_hora: i.data_hora})),
-        ...lawton.map(l => ({tipo: 'lawton', valor: 'Escala de Lawton — ' + (l.classificacao||'') + ' (' + (l.escore_total ?? '—') + '/8)', quem: l.avaliador, data_hora: l.data_hora}))
+        ...lawton.map(l => ({tipo: 'lawton', valor: 'Escala de Lawton — ' + (l.escore_total ?? '—') + '/' + LAWTON_MAX_TOTAL, quem: l.avaliador, data_hora: l.data_hora})),
+        ...sae.map(s => ({tipo: 'sae', valor: 'Consulta de Enfermagem (SAE)' + (s.queixa_principal ? ' — ' + s.queixa_principal : ''), quem: s.enfermeiro, data_hora: s.data_hora}))
       ].sort((a,b) => new Date(b.data_hora) - new Date(a.data_hora)).slice(0, 15);
       if(!itens.length){ el.innerHTML = '<div class="estado">Nenhum registro ainda.</div>'; return; }
-      const icones = {agua:'💧', fralda:'🧷', alimentacao:'🍽️', katz:'📋', higiene:'🛁', decubito:'🔄', anotacao:'📝', vitais:'❤️', evolucao:'📔', curativo:'🩹', evacuacao:'🚽', diurese:'💛', mobilidade:'🚶', pele:'🧴', comportamento:'🧠', dor:'😖', intercorrencia:'🚨', lawton:'📈'};
+      const icones = {agua:'💧', fralda:'🧷', alimentacao:'🍽️', katz:'📋', higiene:'🛁', decubito:'🔄', anotacao:'📝', vitais:'❤️', evolucao:'📔', curativo:'🩹', evacuacao:'🚽', diurese:'💛', mobilidade:'🚶', pele:'🧴', comportamento:'🧠', dor:'😖', intercorrencia:'🚨', lawton:'📈', sae:'🩺'};
       el.innerHTML = itens.map(r=>{
         const d = r.data_hora ? new Date(r.data_hora) : null;
         const dstr = d ? d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+' às '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) : '';
@@ -2301,9 +2305,11 @@
   let katzEditandoId = null;
 
   function classificarKatz(escore){
-    if(escore === 6) return 'Independente';
-    if(escore >= 4) return 'Comprometimento moderado';
-    return 'Muito dependente';
+    if(escore === 6) return 'Independência Total';
+    if(escore === 5) return 'Dependência Ligeira';
+    if(escore >= 3) return 'Dependência Moderada';
+    if(escore >= 1) return 'Dependência Grave';
+    return 'Dependência Total';
   }
 
   function telaKatz(moradorId, editar){
@@ -2437,40 +2443,60 @@
   }
 
   // ---------- ESCALA DE LAWTON (AIVDs) ----------
+  // Pontuação graduada por item (não é sim/não) — reconstruída a partir do
+  // formulário oficial em papel. CONFERE linha por linha com o impresso antes
+  // de confiar 100%: cada opção mostra o ponto dela do lado.
   const LAWTON_ITENS = [
-    {chave:'telefone', label:'Uso do telefone',
-      texto1:'Usa o telefone por iniciativa própria: procura números e disca sozinho',
-      texto0:'É incapaz de usar o telefone, ou só atende chamadas sem discar sozinho'},
-    {chave:'compras', label:'Fazer compras',
-      texto1:'Faz sozinho as compras necessárias',
-      texto0:'Precisa de acompanhamento pra qualquer compra, ou é incapaz de comprar'},
-    {chave:'preparo_refeicoes', label:'Preparo de refeições',
-      texto1:'Planeja, prepara e serve refeições adequadas sozinho',
-      texto0:'Precisa que preparem e sirvam a refeição pra ele/ela'},
-    {chave:'cuidado_casa', label:'Cuidado da casa',
-      texto1:'Mantém a casa sozinho, ou com ajuda ocasional só pra tarefas pesadas',
-      texto0:'Precisa de ajuda em todas as tarefas domésticas, ou não participa delas'},
-    {chave:'lavagem_roupa', label:'Lavagem de roupa',
-      texto1:'Lava a própria roupa completamente',
-      texto0:'Precisa que lavem a roupa pra ele/ela'},
-    {chave:'transporte', label:'Meio de transporte',
-      texto1:'Viaja sozinho em transporte público, táxi/app ou dirige o próprio carro',
-      texto0:'Só viaja acompanhado, ou não viaja de jeito nenhum'},
-    {chave:'medicacao', label:'Responsabilidade sobre a medicação',
-      texto1:'Toma os remédios na dose e horário certos, por conta própria',
-      texto0:'Precisa que preparem/lembrem a medicação, ou não é capaz de tomar sozinho'},
-    {chave:'financas', label:'Capacidade de lidar com finanças',
-      texto1:'Cuida das próprias finanças (contas, banco etc.)',
-      texto0:'Precisa de ajuda pra lidar com dinheiro, ou é incapaz'}
+    {chave:'preparo_refeicoes', label:'1. Preparar refeições', max:3, opcoes:[
+      {pontos:3, texto:'Planeia, prepara e serve as refeições sem ajuda'},
+      {pontos:2, texto:'Prepara as refeições, se lhe derem os ingredientes'},
+      {pontos:1, texto:'Aquece e serve refeições pré-preparadas, ou prepara mas não mantém dieta adequada'},
+      {pontos:0, texto:'Necessita que lhe preparem e sirvam as refeições'}
+    ]},
+    {chave:'cuidado_casa', label:'2. Lida da casa', max:4, opcoes:[
+      {pontos:4, texto:'Trata da casa sozinho, ou com ajuda ocasional (trabalhos pesados)'},
+      {pontos:3, texto:'Executa tarefas ligeiras, tais como lavar a loiça ou fazer as camas'},
+      {pontos:2, texto:'Executa tarefas ligeiras mas não consegue manter um grau aceitável de limpeza'},
+      {pontos:1, texto:'Necessita de ajuda para todas as tarefas domésticas'},
+      {pontos:0, texto:'Não participa em nenhuma tarefa doméstica'}
+    ]},
+    {chave:'lavagem_roupa', label:'3. Lavar / tratar da roupa', max:2, opcoes:[
+      {pontos:2, texto:'Trata completamente da própria roupa'},
+      {pontos:1, texto:'Lava apenas pequenas peças de roupa'},
+      {pontos:0, texto:'A roupa é toda tratada por outros'}
+    ]},
+    {chave:'financas', label:'4. Gestão do dinheiro', max:2, opcoes:[
+      {pontos:2, texto:'Encarrega-se dos assuntos financeiros sem ajuda (renda, contas, cheques)'},
+      {pontos:1, texto:'É capaz de tratar de pequenas contas do dia a dia, mas precisa de ajuda nas maiores'},
+      {pontos:0, texto:'Incapaz de lidar com dinheiro'}
+    ]},
+    {chave:'transporte', label:'5. Utilizar transportes', max:3, opcoes:[
+      {pontos:3, texto:'Viaja sozinho em transporte público, ou conduz o próprio carro'},
+      {pontos:2, texto:'Desloca-se sozinho de táxi, mas não usa outro tipo de transporte'},
+      {pontos:1, texto:'Viaja em transporte público quando acompanhado'},
+      {pontos:0, texto:'Necessita de táxi/carro com ajuda de outros pra se deslocar, ou não sai de casa'}
+    ]},
+    {chave:'compras', label:'6. Fazer compras', max:3, opcoes:[
+      {pontos:3, texto:'Faz sozinho todas as compras necessárias'},
+      {pontos:2, texto:'Faz sozinho pequenas compras'},
+      {pontos:1, texto:'Precisa de acompanhamento pra fazer qualquer compra'},
+      {pontos:0, texto:'É incapaz de fazer compras'}
+    ]},
+    {chave:'telefone', label:'7. Utilizar o telefone', max:3, opcoes:[
+      {pontos:3, texto:'Usa o telefone por iniciativa própria: procura e disca números sozinho'},
+      {pontos:2, texto:'Disca só alguns números conhecidos'},
+      {pontos:1, texto:'Atende ao telefone mas não disca'},
+      {pontos:0, texto:'Não usa o telefone de jeito nenhum'}
+    ]},
+    {chave:'medicacao', label:'8. Gestão da medicação', max:2, opcoes:[
+      {pontos:2, texto:'Toma a medicação na dose e hora certas, por conta própria'},
+      {pontos:1, texto:'Toma a medicação se for preparada antecipadamente em doses separadas'},
+      {pontos:0, texto:'Incapaz de tomar a medicação sozinho'}
+    ]}
   ];
+  const LAWTON_MAX_TOTAL = LAWTON_ITENS.reduce((s,it)=>s+it.max, 0);
   let lawtonRespostas = {};
   let lawtonEditandoId = null;
-
-  function classificarLawton(escore){
-    if(escore === 8) return 'Independente';
-    if(escore >= 4) return 'Dependência parcial';
-    return 'Dependência importante';
-  }
 
   function telaLawton(moradorId, editar){
     const hashAtual = (editar ? 'editar-lawton-' : 'lawton-') + moradorId;
@@ -2488,13 +2514,12 @@
         ${LAWTON_ITENS.map(it => `
           <div style="font-size:15px;font-weight:700;color:var(--teal-esc);margin:16px 0 8px">${esc(it.label)}</div>
           <div id="lawton-${it.chave}">
-            <div class="chip chip-full" data-valor="1"><span class="chip-full-texto">${esc(it.texto1)}</span><span class="katz-pts">1</span></div>
-            <div class="chip chip-full" data-valor="0"><span class="chip-full-texto">${esc(it.texto0)}</span><span class="katz-pts">0</span></div>
+            ${it.opcoes.map(o => `<div class="chip chip-full" data-valor="${o.pontos}"><span class="chip-full-texto">${esc(o.texto)}</span><span class="katz-pts">${o.pontos}</span></div>`).join('')}
           </div>
         `).join('')}
         <div style="display:flex;justify-content:space-between;align-items:center;margin:20px 0 6px">
-          <div style="font-size:14px;font-weight:700;color:var(--teal-esc)">Escore total</div>
-          <div id="lawton-escore" style="font-size:26px;font-weight:800;color:var(--teal)">0</div>
+          <div style="font-size:14px;font-weight:700;color:var(--teal-esc)">Total</div>
+          <div id="lawton-escore" style="font-size:26px;font-weight:800;color:var(--teal)">0 / ${LAWTON_MAX_TOTAL}</div>
         </div>
         <div id="lawton-classificacao" style="text-align:center;font-size:13px;color:var(--muted);margin-bottom:14px">Responda todos os itens</div>
         <label style="font-size:12.5px;color:var(--muted);display:block;margin:8px 0 4px">Observações (opcional)</label>
@@ -2556,13 +2581,11 @@
     const valores = LAWTON_ITENS.map(it => lawtonRespostas[it.chave]);
     const respondidos = valores.filter(v => v !== undefined);
     const escore = respondidos.reduce((s,v) => s+v, 0);
-    document.getElementById('lawton-escore').textContent = escore;
+    document.getElementById('lawton-escore').textContent = escore + ' / ' + LAWTON_MAX_TOTAL;
     const classEl = document.getElementById('lawton-classificacao');
-    if(respondidos.length < LAWTON_ITENS.length){
-      classEl.textContent = 'Faltam ' + (LAWTON_ITENS.length - respondidos.length) + ' item(ns)';
-      return;
-    }
-    classEl.textContent = 'Classificação: ' + classificarLawton(escore);
+    classEl.textContent = respondidos.length < LAWTON_ITENS.length
+      ? 'Faltam ' + (LAWTON_ITENS.length - respondidos.length) + ' item(ns)'
+      : 'Quanto mais perto de ' + LAWTON_MAX_TOTAL + ', mais independente';
   }
 
   async function salvarLawton(moradorId){
@@ -2572,7 +2595,6 @@
     const f = funcionarioAtual();
     if(!f){ location.hash = 'funcionarios?v=' + encodeURIComponent((lawtonEditandoId?'editar-lawton-':'lawton-')+moradorId); return; }
     const escore = valores.reduce((s,v) => s+v, 0);
-    const classificacao = classificarLawton(escore);
     const obs = document.getElementById('lawton-obs').value.trim();
     msg.textContent = 'Salvando...';
     const btn = document.getElementById('lawton-salvar');
@@ -2581,7 +2603,7 @@
       const respostas = {};
       LAWTON_ITENS.forEach(it => { respostas[it.chave] = lawtonRespostas[it.chave]; });
       respostas.escore_total = escore;
-      respostas.classificacao = classificacao;
+      respostas.classificacao = escore + ' / ' + LAWTON_MAX_TOTAL;
       respostas.observacoes = obs || null;
       if(lawtonEditandoId){
         await apiWrite('avaliacoes_lawton?id=eq.'+encodeURIComponent(lawtonEditandoId), 'PATCH', respostas);
@@ -2596,6 +2618,122 @@
     }catch(e){
       msg.textContent = '⚠️ Erro: ' + esc(e.message) + '. Se a tabela "avaliacoes_lawton" não existe, rode o SQL que te mandei.';
     }finally{
+      if(btn) btn.disabled = false;
+    }
+  }
+
+  // ---------- CONSULTA DE ENFERMAGEM (SAE) ----------
+  // Ficha de exame físico/avaliação de enfermagem. Não é escala somada — cada
+  // seção é um grupo de achados que podem coexistir (multi-seleção), como no
+  // formulário em papel. Fica de fora, por enquanto, a parte de "Diagnóstico
+  // de Enfermagem + Prescrição/Horário" (isso é plano de cuidado, tratado
+  // separado, junto com o Plano Terapêutico).
+  const SAE_SECOES = [
+    {chave:'neurologico', titulo:'Sistema Neurológico', opcoes:['Consciente','Orientado','Sedado','Torporoso','Comatoso','Agitado','Reage a estímulos','Não reage']},
+    {chave:'pupilas', titulo:'Pupilas', opcoes:['Mióticas','Midriáticas','Fotoreagentes','Não reagentes','Isocóricas','Anisocóricas']},
+    {chave:'regulacao_termica', titulo:'Regulação Térmica', opcoes:['Hipotérmico','Subfebril','Afebril','Febril']},
+    {chave:'oxigenacao', titulo:'Oxigenação', opcoes:['Eupneico','Bradipneico','Taquipneico','Dispneico','Oxigenoterapia','Ar ambiente','Máscara de Venturi','Intubação']},
+    {chave:'pele', titulo:'Pele', opcoes:['Normocorada','Hipocorada','Acianótica','Cianótica','Ictérica','Anictérica']},
+    {chave:'gastrointestinal', titulo:'Sistema Gastrointestinal', opcoes:['SNG','SOG','SNE','NPT','VO','Gavagem','Aberta','Êmese','Evacuações presentes','Evacuações ausentes','Flatos presentes','Flatos ausentes']},
+    {chave:'vascular', titulo:'Regulação Vascular', opcoes:['Normocárdico','Bradicárdico','Taquicárdico','Pulso cheio','Pulso filiforme','Rítmico','Arrítmico','Normotenso','Hipertenso','Hipotenso']},
+    {chave:'abdominal', titulo:'Regulação Abdominal', opcoes:['Normotenso','Tenso','Globoso','Distendido','Côncavo','RHA presente','RHA ausente']},
+    {chave:'urinario', titulo:'Sistema Urinário', opcoes:['Espontâneo','SVD','Anúria','Oligúria','Poliúria','Disúria','Hematúria','Estímulo medicamentoso']},
+    {chave:'ulcera', titulo:'Úlcera por Compressão', opcoes:['Sem úlcera','Grau I','Grau II','Grau III','Grau IV']}
+  ];
+  let saeRespostas = {};
+
+  function ligarMultiToggle(containerId, chaveSecao){
+    const cont = document.getElementById(containerId);
+    cont.querySelectorAll('.chip').forEach(el=>{
+      el.addEventListener('click', ()=>{
+        el.classList.toggle('sel');
+        const marcados = Array.from(cont.querySelectorAll('.chip.sel')).map(c=>c.dataset.valor);
+        saeRespostas[chaveSecao] = marcados;
+      });
+    });
+  }
+
+  function telaSAE(moradorId){
+    const hashAtual = 'sae-' + moradorId;
+    if(!exigirFuncionario(hashAtual)) return;
+    saeRespostas = {};
+    app.innerHTML = `
+      <div class="topo" style="background:linear-gradient(120deg,#2f6f6e,#1a6b4a)">
+        <button class="voltar" id="btn-voltar-morador">← Voltar</button>
+        <h1>🩺 Consulta de Enfermagem (SAE)</h1>
+        <p>Marque quantos achados forem aplicáveis em cada seção</p>
+      </div>
+      ${bannerFuncionario(hashAtual)}
+      <div class="wrap">
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:10px 0 4px">Prontuário</label>
+        <input id="sae-prontuario" type="text" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">Leito</label>
+        <input id="sae-leito" type="text" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">Dia de internação</label>
+        <input id="sae-dia" type="text" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">
+        <div style="display:flex;gap:16px;margin:14px 0 4px">
+          <div style="flex:1">
+            <div style="font-size:12.5px;color:var(--muted);margin-bottom:6px">Etilista</div>
+            <div class="chip-opcoes" id="sae-etilista">${['Sim','Não'].map(v=>`<div class="chip" data-valor="${v}">${v}</div>`).join('')}</div>
+          </div>
+          <div style="flex:1">
+            <div style="font-size:12.5px;color:var(--muted);margin-bottom:6px">Tabagista</div>
+            <div class="chip-opcoes" id="sae-tabagista">${['Sim','Não'].map(v=>`<div class="chip" data-valor="${v}">${v}</div>`).join('')}</div>
+          </div>
+        </div>
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">Queixa principal</label>
+        <textarea id="sae-queixa" rows="2" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px"></textarea>
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">Alergias</label>
+        <input id="sae-alergias" type="text" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:12px 0 4px">Medicação em uso</label>
+        <textarea id="sae-medicacao" rows="2" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px"></textarea>
+        <div style="display:flex;gap:10px;margin:14px 0 4px">
+          <div style="flex:1"><label style="font-size:12.5px;color:var(--muted);display:block;margin-bottom:4px">PA</label><input id="sae-pa" type="text" placeholder="Ex.: 120x80" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px"></div>
+          <div style="flex:1"><label style="font-size:12.5px;color:var(--muted);display:block;margin-bottom:4px">HGT</label><input id="sae-hgt" type="text" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px"></div>
+          <div style="flex:1"><label style="font-size:12.5px;color:var(--muted);display:block;margin-bottom:4px">Temp. (°C)</label><input id="sae-temp" type="text" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px"></div>
+        </div>
+        ${SAE_SECOES.map(sec => `
+          <div style="font-size:15px;font-weight:700;color:var(--teal-esc);margin:18px 0 8px">${esc(sec.titulo)}</div>
+          <div class="chip-opcoes" id="sae-${sec.chave}">
+            ${sec.opcoes.map(o=>`<div class="chip" data-valor="${esc(o)}">${esc(o)}</div>`).join('')}
+          </div>
+        `).join('')}
+        <label style="font-size:12.5px;color:var(--muted);display:block;margin:14px 0 4px">Observações</label>
+        <textarea id="sae-obs" rows="3" style="width:100%;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px"></textarea>
+        <button id="sae-salvar" style="width:100%;background:#1a6b4a;color:#fff;border:none;border-radius:14px;padding:14px;font-size:15px;font-weight:700;margin-top:14px">💾 Salvar consulta</button>
+        <div id="sae-msg" style="text-align:center;font-size:12.5px;color:var(--muted);margin-top:10px"></div>
+      </div>
+    `;
+    document.getElementById('btn-voltar-morador').addEventListener('click', () => { location.hash = 'morador-' + moradorId; });
+    let etilista = null, tabagista = null;
+    ligarChips('sae-etilista', v => etilista = v);
+    ligarChips('sae-tabagista', v => tabagista = v);
+    SAE_SECOES.forEach(sec => ligarMultiToggle('sae-' + sec.chave, sec.chave));
+    document.getElementById('sae-salvar').addEventListener('click', () => salvarSAE(moradorId, () => etilista, () => tabagista));
+  }
+
+  async function salvarSAE(moradorId, getEtilista, getTabagista){
+    const msg = document.getElementById('sae-msg');
+    const f = funcionarioAtual();
+    if(!f){ location.hash = 'funcionarios?v=' + encodeURIComponent('sae-'+moradorId); return; }
+    const val = id => { const v = document.getElementById(id).value.trim(); return v || null; };
+    msg.textContent = 'Salvando...';
+    const btn = document.getElementById('sae-salvar');
+    if(btn) btn.disabled = true;
+    try{
+      const moradorNome = await nomeDoMorador(moradorId);
+      await apiWrite('consultas_enfermagem', 'POST', {
+        morador_id: moradorId, morador_nome: moradorNome, enfermeiro: f.nome,
+        prontuario: val('sae-prontuario'), leito: val('sae-leito'), dia_internacao: val('sae-dia'),
+        etilista: getEtilista(), tabagista: getTabagista(),
+        queixa_principal: val('sae-queixa'), alergias: val('sae-alergias'), medicacao_uso: val('sae-medicacao'),
+        pa: val('sae-pa'), hgt: val('sae-hgt'), temperatura: val('sae-temp'),
+        respostas: saeRespostas, observacoes: val('sae-obs'),
+        data_hora: new Date().toISOString()
+      });
+      location.hash = 'morador-' + moradorId;
+    }catch(e){
+      msg.textContent = '⚠️ Erro: ' + esc(e.message) + '. Se a tabela "consultas_enfermagem" não existe, rode o SQL que te mandei.';
       if(btn) btn.disabled = false;
     }
   }
@@ -2637,6 +2775,7 @@
     else if((m = apósPrefixo(hash, 'katz-')) !== null) telaKatz(m);
     else if((m = apósPrefixo(hash, 'editar-lawton-')) !== null) telaLawton(m, true);
     else if((m = apósPrefixo(hash, 'lawton-')) !== null) telaLawton(m);
+    else if((m = apósPrefixo(hash, 'sae-')) !== null) telaSAE(m);
     else if(hash === 'morador-novo') telaMoradorNovo();
     else if((m = apósPrefixo(hash, 'morador-editar-')) !== null) telaMoradorEditar(m);
     else if((m = apósPrefixo(hash, 'medicacoes-')) !== null) telaMedicacoes(m);
