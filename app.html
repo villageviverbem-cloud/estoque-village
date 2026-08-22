@@ -1420,6 +1420,7 @@
         {chave:'alimentacao', hashBase:'registrar-alimentacao', editavel:false, ico:'🍽️', bg:'#fef2e8', cor:'#c77b3b', nome:'Alimentação', desc:'Registrar refeição e aceitação'},
         {chave:'higiene', hashBase:'registrar-higiene', editavel:false, ico:'🛁', bg:'#e8f4f4', cor:'#2f6f6e', nome:'Higiene / Banho', desc:'Registrar tipo de banho/higiene'},
         {chave:'decubito', hashBase:'registrar-decubito', editavel:false, ico:'🔄', bg:'#eaf1fb', cor:'#4a6fa5', nome:'Mudança de decúbito', desc:'Registrar posição'},
+        {chave:'curativo', hashBase:'registrar-curativo', editavel:false, ico:'🩹', bg:'#fef2e8', cor:'#c77b3b', nome:'Curativo', desc:'Registrar troca/checagem de curativo'},
         {chave:'anotacao', hashBase:'anotacao', editavel:false, ico:'📝', bg:'#f0f0f0', cor:'#607080', nome:'Anotação livre', desc:'Escrever uma observação'},
         {chave:'vitais', hashBase:'vitais', editavel:false, ico:'❤️', bg:'#fdecec', cor:'#c85a5a', nome:'Sinais Vitais', desc:'Registrar pressão, temperatura etc.'},
         {chave:'evolucao', hashBase:'evolucao', editavel:false, ico:'📔', bg:'#fef2e8', cor:'#c77b3b', nome:'Evolução Diária', desc:'Registrar evolução do turno'},
@@ -1536,6 +1537,11 @@
       titulo: '🔄 Mudança de decúbito', cor: '#4a6fa5',
       pergunta: 'Posição', careType: 'Mudança de decúbito',
       opcoes: ['Decúbito dorsal','Decúbito lateral direito','Decúbito lateral esquerdo','Sentado / poltrona'].map(v=>({label:v, valor:v}))
+    },
+    curativo: {
+      titulo: '🩹 Curativo', cor: '#c77b3b',
+      pergunta: 'Situação', careType: 'Curativo',
+      opcoes: ['Realizado','Não realizado','Recusado pelo residente'].map(v=>({label:v, valor:v}))
     }
   };
   let cuidadoSelecionado = null;
@@ -2052,6 +2058,7 @@
     else if((m = apósPrefixo(hash, 'registrar-fralda-')) !== null) telaRegistrarSimples('fralda', m);
     else if((m = apósPrefixo(hash, 'registrar-higiene-')) !== null) telaRegistrarSimples('higiene', m);
     else if((m = apósPrefixo(hash, 'registrar-decubito-')) !== null) telaRegistrarSimples('decubito', m);
+    else if((m = apósPrefixo(hash, 'registrar-curativo-')) !== null) telaRegistrarSimples('curativo', m);
     else if((m = apósPrefixo(hash, 'registrar-alimentacao-')) !== null) telaRegistrarAlimentacao(m);
     else if((m = apósPrefixo(hash, 'anotacao-')) !== null) telaAnotacao(m);
     else if((m = apósPrefixo(hash, 'vitais-')) !== null) telaVitais(m);
