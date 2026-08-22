@@ -220,7 +220,7 @@
   function atualizarSidebarAtiva(hashAtual){
     let grupo = hashAtual;
     if(hashAtual.indexOf('leitor-') === 0){ /* mantém o hash completo, casa com o sub-item */ }
-    else if(hashAtual.indexOf('morador') === 0 || ['registrar-agua-','registrar-fralda-','registrar-higiene-','registrar-decubito-','registrar-curativo-','registrar-evacuacao-','registrar-diurese-','registrar-mobilidade-','registrar-pele-','registrar-comportamento-','registrar-dor-','registrar-alimentacao-','registrar-intercorrencia-','anotacao-','vitais-','evolucao-','katz-','editar-katz-','lawton-','editar-lawton-','sae-','medicacoes-','administrar-'].some(p=>hashAtual.indexOf(p)===0)) grupo = 'moradores';
+    else if(hashAtual.indexOf('morador') === 0 || ['registrar-agua-','registrar-fralda-','registrar-higiene-','registrar-decubito-','registrar-curativo-','registrar-evacuacao-','registrar-diurese-','registrar-mobilidade-','registrar-pele-','registrar-comportamento-','registrar-dor-','registrar-alimentacao-','registrar-intercorrencia-','anotacao-','vitais-','evolucao-','katz-','editar-katz-','lawton-','editar-lawton-','sae-','plano-','medicacoes-','administrar-'].some(p=>hashAtual.indexOf(p)===0)) grupo = 'moradores';
     else if(hashAtual.indexOf('funcionarios') === 0) grupo = 'funcionarios';
     document.querySelectorAll('#sidebar [data-hash]').forEach(a=>{
       a.classList.toggle('ativo', a.dataset.hash === grupo);
@@ -390,6 +390,12 @@
           <div class="txt"><div class="nome">Medicamentos por residente</div><div class="desc">Prescrições, estoque de cada remédio e leitor de código de barras</div></div>
           <div class="seta" style="color:${s.cor}">→</div>
         </a>` : '';
+    const opInfeccoes = chave === 'enfermagem' ? `
+        <a class="opcao" href="#referencia-infeccoes">
+          <div class="ico" style="background:${s.corBg};color:${s.cor}">📖</div>
+          <div class="txt"><div class="nome">Referência: Infecções Hospitalares</div><div class="desc">Quadro histórico de tipos e modos de transmissão</div></div>
+          <div class="seta" style="color:${s.cor}">→</div>
+        </a>` : '';
     app.innerHTML = `
       <div class="topo" style="background:linear-gradient(120deg,${s.grad[0]},${s.grad[1]})">
         <button class="voltar" onclick="voltarParaIlpi()">← Voltar</button>
@@ -414,6 +420,7 @@
           <div class="seta" style="color:${s.cor}">→</div>
         </a>
         ${opMedicamentos}
+        ${opInfeccoes}
         ${opMoradores}
         <a class="opcao" href="#estoque">
           <div class="ico" style="background:#eaf7f0;color:#2f9e6f">📊</div>
@@ -1547,7 +1554,8 @@
         {chave:'evolucao', hashBase:'evolucao', editavel:false, ico:'📔', bg:'#fef2e8', cor:'#c77b3b', nome:'Evolução Diária', desc:'Registrar evolução do turno'},
         {chave:'katz', hashBase:'katz', editavel:true, ico:'📋', bg:'#f0ecfb', cor:'#7a5fb0', nome:'Escala de Katz', desc:'Avaliação de dependência (AVDs)'},
         {chave:'lawton', hashBase:'lawton', editavel:true, ico:'📈', bg:'#f0ecfb', cor:'#7a5fb0', nome:'Escala de Lawton', desc:'Atividades instrumentais de vida diária (AIVDs)'},
-        {chave:'sae', hashBase:'sae', editavel:false, ico:'🩺', bg:'#eaf7f0', cor:'#1a6b4a', nome:'Consulta de Enfermagem (SAE)', desc:'Exame físico e avaliação de enfermagem'}
+        {chave:'sae', hashBase:'sae', editavel:false, ico:'🩺', bg:'#eaf7f0', cor:'#1a6b4a', nome:'Consulta de Enfermagem (SAE)', desc:'Exame físico e avaliação de enfermagem'},
+        {chave:'plano', hashBase:'plano', editavel:false, ico:'🧭', bg:'#f0ecfb', cor:'#7a5fb0', nome:'Plano Terapêutico Semanal', desc:'Atividades da semana por período, com Feito'}
       ];
       area.innerHTML = `
         <div class="opcoes">
@@ -2738,6 +2746,142 @@
     }
   }
 
+  // ---------- PLANO TERAPÊUTICO SEMANAL ----------
+  const PLANO_DIAS = ['Segunda','Terça','Quarta','Quinta','Sexta','Sábado','Domingo'];
+  const PLANO_PERIODOS = ['Manhã','Tarde','Noite'];
+  let planoCelulas = {}; // 'Dia|Periodo' -> {id, atividade, feito}
+
+  function telaPlanoTerapeutico(moradorId){
+    const hashAtual = 'plano-' + moradorId;
+    if(!exigirFuncionario(hashAtual)) return;
+    app.innerHTML = `
+      <div class="topo" style="background:linear-gradient(120deg,#9070c0,#7a5fb0)">
+        <button class="voltar" id="btn-voltar-morador">← Voltar</button>
+        <h1>🧭 Plano Terapêutico Semanal</h1>
+        <p>Atividade de cada período + marcar quando for feito</p>
+      </div>
+      ${bannerFuncionario(hashAtual)}
+      <div id="plano-area" class="wrap"><div class="estado"><div class="spin"></div>Carregando...</div></div>
+    `;
+    document.getElementById('btn-voltar-morador').addEventListener('click', () => { location.hash = 'morador-' + moradorId; });
+    carregarPlanoTerapeutico(moradorId);
+  }
+
+  async function carregarPlanoTerapeutico(moradorId){
+    const token = viewToken;
+    const el = document.getElementById('plano-area');
+    try{
+      const rows = await api('plano_terapeutico?select=*&morador_id=eq.'+encodeURIComponent(moradorId));
+      if(token !== viewToken) return;
+      planoCelulas = {};
+      PLANO_DIAS.forEach(dia => {
+        PLANO_PERIODOS.forEach(periodo => {
+          const existente = rows.find(r => r.dia_semana === dia && r.periodo === periodo);
+          planoCelulas[dia+'|'+periodo] = existente
+            ? {id: existente.id, atividade: existente.atividade || '', feito: !!existente.feito}
+            : {id: null, atividade: '', feito: false};
+        });
+      });
+      el.innerHTML = `
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;min-width:640px">
+            <tr>
+              <th style="text-align:left;padding:8px;font-size:12px;color:var(--muted)"></th>
+              ${PLANO_PERIODOS.map(p=>`<th style="text-align:left;padding:8px;font-size:12px;color:var(--muted)">${p}</th>`).join('')}
+            </tr>
+            ${PLANO_DIAS.map(dia => `
+              <tr>
+                <td style="padding:8px;font-size:12.5px;font-weight:700;color:var(--teal-esc);white-space:nowrap;vertical-align:top">${dia}</td>
+                ${PLANO_PERIODOS.map(periodo => {
+                  const c = planoCelulas[dia+'|'+periodo];
+                  const chave = dia+'|'+periodo;
+                  return `<td style="padding:6px;vertical-align:top">
+                    <input type="text" class="pl-atividade" data-chave="${esc(chave)}" value="${esc(c.atividade)}" placeholder="Atividade" style="width:100%;border:1px solid var(--borda);border-radius:8px;padding:7px;font-size:12.5px;margin-bottom:4px">
+                    <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted)">
+                      <input type="checkbox" class="pl-feito" data-chave="${esc(chave)}" ${c.feito?'checked':''} style="width:15px;height:15px"> Feito
+                    </label>
+                  </td>`;
+                }).join('')}
+              </tr>
+            `).join('')}
+          </table>
+        </div>
+        <button id="plano-salvar" style="width:100%;background:#7a5fb0;color:#fff;border:none;border-radius:14px;padding:14px;font-size:15px;font-weight:700;margin-top:16px">💾 Salvar plano</button>
+        <div id="plano-msg" style="text-align:center;font-size:12.5px;color:var(--muted);margin-top:10px"></div>
+      `;
+      el.querySelectorAll('.pl-atividade').forEach(inp=>{
+        inp.addEventListener('input', ()=>{ planoCelulas[inp.dataset.chave].atividade = inp.value; });
+      });
+      el.querySelectorAll('.pl-feito').forEach(chk=>{
+        chk.addEventListener('change', ()=>{ planoCelulas[chk.dataset.chave].feito = chk.checked; });
+      });
+      document.getElementById('plano-salvar').addEventListener('click', () => salvarPlanoTerapeutico(moradorId));
+    }catch(e){
+      if(token !== viewToken) return;
+      el.innerHTML = '⚠️ Não consegui carregar. <br><small>('+esc(e.message)+')</small> Se a tabela "plano_terapeutico" não existe, rode o SQL que te mandei.';
+    }
+  }
+
+  async function salvarPlanoTerapeutico(moradorId){
+    const msg = document.getElementById('plano-msg');
+    const f = funcionarioAtual();
+    if(!f){ location.hash = 'funcionarios?v=' + encodeURIComponent('plano-'+moradorId); return; }
+    msg.textContent = 'Salvando...';
+    const btn = document.getElementById('plano-salvar');
+    if(btn) btn.disabled = true;
+    try{
+      const moradorNome = await nomeDoMorador(moradorId);
+      const agora = new Date().toISOString();
+      const chaves = Object.keys(planoCelulas);
+      for(const chave of chaves){
+        const c = planoCelulas[chave];
+        const [dia, periodo] = chave.split('|');
+        if(c.id){
+          await apiWrite('plano_terapeutico?id=eq.'+encodeURIComponent(c.id), 'PATCH', {
+            atividade: c.atividade || null, feito: c.feito, atualizado_por: f.nome, atualizado_em: agora
+          });
+        }else if(c.atividade || c.feito){
+          await apiWrite('plano_terapeutico', 'POST', {
+            morador_id: moradorId, morador_nome: moradorNome, dia_semana: dia, periodo,
+            atividade: c.atividade || null, feito: c.feito, atualizado_por: f.nome, atualizado_em: agora
+          });
+        }
+      }
+      location.hash = 'morador-' + moradorId;
+    }catch(e){
+      msg.textContent = '⚠️ Erro: ' + esc(e.message) + '.';
+      if(btn) btn.disabled = false;
+    }
+  }
+
+  // ---------- REFERÊNCIA: INFECÇÕES HOSPITALARES ----------
+  const REFERENCIA_INFECCOES = [
+    {periodo:'Idade Média — Início do capitalismo (Séc. XVII)', acao:'Expectante — recolhimento e alojamento de indigentes e enfermos', tipo:'Exógenas específicas — causadas por microrganismos não pertencentes à flora humana normal, com quadro clínico específico, tipo doenças comunitárias (ex.: B. Koch — tuberculose; Vibrião colérico — cólera)', transmissao:'Vias aéreas superiores e por veículos (água, solo, mãos etc.)'},
+    {periodo:'Século XVIII até início do Séc. XX', acao:'Intervenção no corpo, com procedimentos invasivos, sem recursos de assepsia e antimicrobianos', tipo:'Exógenas e endógenas inespecíficas — causadas por microrganismos da flora humana ou não, a partir das condições de invasão/reprodução no organismo, apresentando infecções em vários "sítios" (ex.: urinárias, respiratórias, de ferida cirúrgica)', transmissao:'Predominantemente por veiculação, através de procedimentos invasivos (mãos e instrumentais) e migração da flora humana pra áreas estéreis'},
+    {periodo:'Meados do Séc. XX', acao:'Intervenções no corpo com recursos de assepsia e medicamentos antimicrobianos/imunodepressivos', tipo:'Endógenas inespecíficas multirresistentes — causadas por microrganismos da flora humana, com resistência alterada aos antimicrobianos', transmissao:'Pelo ambiente (liberação da flora cutâneo-mucosa), por veiculação e migração'}
+  ];
+
+  function telaReferenciaInfeccoes(){
+    app.innerHTML = `
+      <div class="topo" style="background:linear-gradient(120deg,${SETORES.enfermagem.grad[0]},${SETORES.enfermagem.grad[1]})">
+        <button class="voltar" onclick="location.hash='enfermagem'">← Voltar</button>
+        <h1>📖 Infecções Hospitalares</h1>
+        <p>Formas de manifestação na evolução da assistência hospitalar</p>
+      </div>
+      <div class="wrap">
+        ${REFERENCIA_INFECCOES.map(r => `
+          <div style="border:1px solid var(--borda);border-radius:14px;padding:14px;margin-bottom:14px">
+            <div style="font-weight:700;color:var(--teal-esc);font-size:14px;margin-bottom:8px">🕰️ ${esc(r.periodo)}</div>
+            <div style="font-size:13px;margin-bottom:6px"><b>Ação assistencial:</b> ${esc(r.acao)}</div>
+            <div style="font-size:13px;margin-bottom:6px"><b>Tipo de infecção predominante:</b> ${esc(r.tipo)}</div>
+            <div style="font-size:13px"><b>Modo de transmissão:</b> ${esc(r.transmissao)}</div>
+          </div>
+        `).join('')}
+      </div>
+      <div class="rodape">Village Viver Bem · Residencial Care · Material de referência</div>
+    `;
+  }
+
   // ---------- ROTEADOR ----------
   let viewToken = 0;
   function apósPrefixo(hash, prefixo){
@@ -2776,6 +2920,8 @@
     else if((m = apósPrefixo(hash, 'editar-lawton-')) !== null) telaLawton(m, true);
     else if((m = apósPrefixo(hash, 'lawton-')) !== null) telaLawton(m);
     else if((m = apósPrefixo(hash, 'sae-')) !== null) telaSAE(m);
+    else if((m = apósPrefixo(hash, 'plano-')) !== null) telaPlanoTerapeutico(m);
+    else if(hash === 'referencia-infeccoes') telaReferenciaInfeccoes();
     else if(hash === 'morador-novo') telaMoradorNovo();
     else if((m = apósPrefixo(hash, 'morador-editar-')) !== null) telaMoradorEditar(m);
     else if((m = apósPrefixo(hash, 'medicacoes-')) !== null) telaMedicacoes(m);
