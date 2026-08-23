@@ -1891,11 +1891,41 @@
         <h1>🚨 Intercorrências</h1>
         <p>Abertas primeiro, mais recentes no topo</p>
       </div>
-      <div class="titulo-sec" style="padding:20px 20px 4px;font-size:12.5px;color:var(--muted)">Pra registrar uma nova, abre a ficha do morador e usa o card "Intercorrência".</div>
+      <div class="wrap" style="padding-bottom:0">
+        <div style="background:#fff;border:1px solid var(--borda);border-radius:14px;padding:14px 16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <select id="ic-morador-select" style="flex:1;min-width:180px;border:1px solid var(--borda);border-radius:10px;padding:11px;font-size:14px">
+            <option value="">Carregando moradores...</option>
+          </select>
+          <button id="ic-registrar-btn" style="background:#c0392b;color:#fff;border:none;border-radius:10px;padding:11px 18px;font-size:14px;font-weight:700;white-space:nowrap">🚨 Registrar nova</button>
+        </div>
+        <div id="ic-registrar-msg" style="text-align:center;font-size:12.5px;color:var(--muted);margin-top:8px"></div>
+      </div>
       <div id="ic-lista" class="wrap"><div class="estado"><div class="spin"></div>Carregando...</div></div>
       <div class="rodape">Village Viver Bem · Residencial Care · Intercorrências v1</div>
     `;
+    carregarSelectMoradoresIntercorrencia();
+    document.getElementById('ic-registrar-btn').addEventListener('click', () => {
+      const id = document.getElementById('ic-morador-select').value;
+      const msg = document.getElementById('ic-registrar-msg');
+      if(!id){ msg.textContent = 'Escolha um morador primeiro.'; return; }
+      location.hash = 'registrar-intercorrencia-' + id;
+    });
     carregarIntercorrencias();
+  }
+
+  async function carregarSelectMoradoresIntercorrencia(){
+    const token = viewToken;
+    try{
+      const lista = await buscarMoradoresLista();
+      if(token !== viewToken) return;
+      const sel = document.getElementById('ic-morador-select');
+      if(!sel) return;
+      sel.innerHTML = '<option value="">Selecione o morador...</option>' +
+        lista.map(m => `<option value="${esc(m.id)}">${esc(m.nome)}</option>`).join('');
+    }catch(_e){
+      const sel = document.getElementById('ic-morador-select');
+      if(sel) sel.innerHTML = '<option value="">Não consegui carregar</option>';
+    }
   }
 
   async function carregarIntercorrencias(){
