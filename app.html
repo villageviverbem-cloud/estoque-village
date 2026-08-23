@@ -210,7 +210,7 @@
   // ---------- BARRA LATERAL ----------
   document.getElementById('sb-financeiro').addEventListener('click', function(e){ e.preventDefault(); irExterno('financeiro', APP_FINANCEIRO); });
   document.getElementById('sb-painel').addEventListener('click', function(e){ e.preventDefault(); irExterno('painel', PAINEL_URL); });
-  document.getElementById('sb-medicamentos').addEventListener('click', function(e){ e.preventDefault(); irExterno('farmacia', FARMACIA_MEDICAMENTOS_URL); });
+  document.getElementById('sb-medicamentos').addEventListener('click', function(e){ e.preventDefault(); location.hash = 'moradores'; });
   function toggleSidebar(forcar){
     const layout = document.getElementById('layout');
     const abrir = forcar !== undefined ? forcar : !layout.classList.contains('sb-aberta');
@@ -437,9 +437,9 @@
           <div class="seta" style="color:${s.cor}">→</div>
         </a>` : '';
     const opMedicamentos = chave === 'farmacia' ? `
-        <a class="opcao" href="${FARMACIA_MEDICAMENTOS_URL}">
+        <a class="opcao" href="#moradores">
           <div class="ico" style="background:${s.corBg};color:${s.cor}">💊</div>
-          <div class="txt"><div class="nome">Medicamentos por residente</div><div class="desc">Prescrições, estoque de cada remédio e leitor de código de barras</div></div>
+          <div class="txt"><div class="nome">Medicamentos por residente</div><div class="desc">Escolha o morador e abra "Medicações" na ficha dele</div></div>
           <div class="seta" style="color:${s.cor}">→</div>
         </a>` : '';
     const opInfeccoes = chave === 'enfermagem' ? `
