@@ -58,7 +58,6 @@
 <script>
 const SUPABASE_URL = 'https://ilssyjyabxgtwwodbzpz.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_eyYyLvibu5i4bZMAzcDTCg_Hn2Oea6j';
-const ILPI_URL = 'https://eduardonoronha9.app.n8n.cloud/webhook/ilpi';
 
 function esc(s){ return (s===undefined||s===null?'':String(s)).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function norm(s){ return (s||'').toString().trim().toLowerCase(); }
@@ -205,7 +204,7 @@ async function montar(){
     : `<div class="empty" style="color:#1e8449;font-weight:600;font-style:normal">👍 Todos os residentes com cuidados em dia.</div>`;
 
   document.getElementById('app').innerHTML = `
-    <a class="back" href="${ILPI_URL}">← Voltar ao Portal</a>
+    <a class="back" href="app.html#inicio">← Voltar ao Início</a>
     <h1>📊 Visão Geral</h1>
     <div class="sub">Village Viver Bem Residencial-care · Atualizado em ${agora}</div>
 
