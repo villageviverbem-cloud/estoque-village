@@ -384,10 +384,10 @@
           <div class="nome">Visão Geral</div>
           <div class="desc">Indicadores, alertas e todos os moradores numa tela só, sem entrar em cada um</div>
         </a>
-        <a class="pasta destaque" href="#farmacia">
-          <div class="seta">→</div><div class="ico">💊</div>
-          <div class="nome">Farmácia</div>
-          <div class="desc">Medicação por morador · entrada, saída e alerta de falta</div>
+        <a class="pasta destaque" href="#moradores" style="background:linear-gradient(120deg,#9070c0,#7a5fb0)">
+          <div class="seta">→</div><div class="ico">🧑‍🦳</div>
+          <div class="nome">Moradores</div>
+          <div class="desc">Ver, cadastrar e acompanhar cada residente</div>
         </a>
         <a class="pasta" href="#cozinha">
           <div class="seta">→</div><div class="ico" style="background:#fef2e8;color:#c77b3b">🍳</div>
@@ -405,9 +405,9 @@
           <div class="seta">→</div><div class="ico" style="background:#fdecec;color:#c85a5a">🩺</div>
           <div class="nome">Enfermagem</div><div class="desc">Insumos, curativos e materiais</div>
         </a>
-        <a class="pasta" href="#moradores">
-          <div class="seta">→</div><div class="ico" style="background:#f0ecfb;color:#7a5fb0">🧑‍🦳</div>
-          <div class="nome">Moradores</div><div class="desc">Ver e cadastrar residentes</div>
+        <a class="pasta" href="#farmacia">
+          <div class="seta">→</div><div class="ico" style="background:#e8f4f4;color:#2f6f6e">💊</div>
+          <div class="nome">Farmácia</div><div class="desc">Medicação por morador · entrada, saída e alerta de falta</div>
         </a>
         <a class="pasta" href="#funcionarios">
           <div class="seta">→</div><div class="ico" style="background:#f0ecfb;color:#7a5fb0">🧑‍⚕️</div>
@@ -455,6 +455,7 @@
         <p>${s.sub}</p>
       </div>
       <div class="instrucao">O que você quer fazer?<span>Escolha uma das opções abaixo</span></div>
+      <div id="setor-alerta-area"></div>
       <div class="opcoes">
         <a class="opcao" href="#leitor-${chave}" style="border:2px solid ${s.cor}">
           <div class="ico" style="background:${s.corBg};color:${s.cor}">📷</div>
@@ -483,6 +484,58 @@
       <div class="dica">${s.dica}</div>
       <div class="rodape">Village Viver Bem · Residencial Care · ${s.nome} v2</div>
     `;
+    carregarAlertaSetor(chave);
+  }
+
+  async function carregarAlertaSetor(chave){
+    const token = viewToken;
+    try{
+      const produtos = await api('produtos?select=nome,estoque_atual,estoque_minimo,setor');
+      if(token !== viewToken) return;
+      const baixo = produtos.filter(p => norm(p.setor) === chave && Number(p.estoque_minimo)>0 && Number(p.estoque_atual)<=Number(p.estoque_minimo));
+      const el = document.getElementById('setor-alerta-area');
+      if(!el || !baixo.length) return;
+      el.innerHTML = `<a class="opcao" href="#estoque-baixo-${chave}" style="border:2px solid #c0392b;background:#fdecec">
+        <div class="ico" style="background:#fff;color:#c0392b">⚠️</div>
+        <div class="txt"><div class="nome">${baixo.length} ${baixo.length===1?'item':'itens'} com estoque baixo</div><div class="desc">Toque pra ver quais são</div></div>
+        <div class="seta" style="color:#c0392b">→</div>
+      </a>`;
+    }catch(_e){ /* alerta é best-effort — se falhar, só não mostra */ }
+  }
+
+  function telaEstoqueBaixoSetor(chave){
+    const s = SETORES[chave];
+    if(!s){ location.hash = 'inicio'; return; }
+    app.innerHTML = `
+      <div class="topo" style="background:linear-gradient(120deg,#c0392b,#922b21)">
+        <button class="voltar" onclick="location.hash='${chave}'">← Voltar</button>
+        <h1>⚠️ Estoque baixo — ${s.nome}</h1>
+      </div>
+      <div id="eb-area" class="wrap"><div class="estado"><div class="spin"></div>Carregando...</div></div>
+    `;
+    carregarEstoqueBaixoSetor(chave);
+  }
+
+  async function carregarEstoqueBaixoSetor(chave){
+    const token = viewToken;
+    const el = document.getElementById('eb-area');
+    try{
+      const produtos = await api('produtos?select=*&order=nome');
+      if(token !== viewToken) return;
+      const baixo = produtos.filter(p => norm(p.setor) === chave && Number(p.estoque_minimo)>0 && Number(p.estoque_atual)<=Number(p.estoque_minimo));
+      if(!baixo.length){ el.innerHTML = '<div class="estado">Nenhum item com estoque baixo nesse setor agora. 👍</div>'; return; }
+      el.innerHTML = baixo.map(p => `<div class="item baixo">
+        <div>
+          <div class="nome">${esc((p.nome||'—').toString().trim())}</div>
+          <div class="sub">${esc((p.unidade||'un').toString().trim())} · mín. ${Number(p.estoque_minimo)}</div>
+          <span class="tag-alerta">⚠ estoque baixo</span>
+        </div>
+        <div class="estoque"><div class="num">${Number(p.estoque_atual)||0}</div><div class="un">${esc((p.unidade||'un').toString().trim())}</div></div>
+      </div>`).join('');
+    }catch(e){
+      if(token !== viewToken) return;
+      el.innerHTML = '⚠️ Não consegui carregar. <br><small>('+esc(e.message)+')</small>';
+    }
   }
 
   // ---------- LEITOR RÁPIDO (lê o código, busca no nosso banco e, se não achar, tenta o nome numa base pública) ----------
@@ -2951,6 +3004,7 @@
     else if(hash === 'estoque') telaEstoque();
     else if(hash === 'moradores') telaMoradores();
     else if((m = apósPrefixo(hash, 'leitor-')) !== null) telaLeitor(m);
+    else if((m = apósPrefixo(hash, 'estoque-baixo-')) !== null) telaEstoqueBaixoSetor(m);
     else if((m = apósPrefixo(hash, 'externo-')) !== null) { if(EXTERNOS[m]) irExterno(m, EXTERNOS[m]); else telaInicio(); }
     else if(hash === 'funcionarios') telaFuncionarios();
     else if(hash === 'funcionarios-novo') telaFuncionarioNovo();
