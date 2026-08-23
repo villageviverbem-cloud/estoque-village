@@ -1702,16 +1702,18 @@
     administrarStatus = null;
     app.innerHTML = `
       <div class="topo" style="background:linear-gradient(120deg,#2f6f6e,#1a6b4a)">
-        <button class="voltar" id="am-voltar" onclick="history.back()">← Voltar</button>
+        <button class="voltar" id="am-voltar">← Voltar</button>
         <h1>💊 Administrar medicamento</h1>
         <p id="am-nome">Carregando...</p>
       </div>
       <div id="am-area" class="wrap"><div class="estado"><div class="spin"></div>Carregando...</div></div>
     `;
-    carregarAdministrarMedicamento(prescricaoId);
+    let voltarHash = 'moradores';
+    document.getElementById('am-voltar').addEventListener('click', () => { location.hash = voltarHash; });
+    carregarAdministrarMedicamento(prescricaoId, v => { voltarHash = v; });
   }
 
-  async function carregarAdministrarMedicamento(prescricaoId){
+  async function carregarAdministrarMedicamento(prescricaoId, setVoltarHash){
     const token = viewToken;
     try{
       const rows = await api('prescricoes?select=*&id=eq.'+encodeURIComponent(prescricaoId));
@@ -1720,6 +1722,7 @@
       const area = document.getElementById('am-area');
       if(!p){ area.innerHTML = '⚠️ Prescrição não encontrada.'; return; }
       document.getElementById('am-nome').textContent = p.medicamento + (p.dose ? ' · ' + p.dose : '');
+      setVoltarHash('medicacoes-' + p.morador_id);
       area.innerHTML = `
         <div style="font-size:14px;font-weight:600;color:var(--teal-esc);margin-bottom:10px">Situação</div>
         <div class="chip-opcoes" id="am-chips">
