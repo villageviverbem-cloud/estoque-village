@@ -494,13 +494,45 @@
       if(token !== viewToken) return;
       const baixo = produtos.filter(p => norm(p.setor) === chave && Number(p.estoque_minimo)>0 && Number(p.estoque_atual)<=Number(p.estoque_minimo));
       const el = document.getElementById('setor-alerta-area');
-      if(!el || !baixo.length) return;
-      el.innerHTML = `<a class="opcao" href="#estoque-baixo-${chave}" style="border:2px solid #c0392b;background:#fdecec">
-        <div class="ico" style="background:#fff;color:#c0392b">⚠️</div>
-        <div class="txt"><div class="nome">${baixo.length} ${baixo.length===1?'item':'itens'} com estoque baixo</div><div class="desc">Toque pra ver quais são</div></div>
-        <div class="seta" style="color:#c0392b">→</div>
-      </a>`;
+      if(el && baixo.length){
+        el.innerHTML = `<a class="opcao" href="#estoque-baixo-${chave}" style="border:2px solid #c0392b;background:#fdecec">
+          <div class="ico" style="background:#fff;color:#c0392b">⚠️</div>
+          <div class="txt"><div class="nome">${baixo.length} ${baixo.length===1?'item':'itens'} com estoque baixo</div><div class="desc">Toque pra ver quais são</div></div>
+          <div class="seta" style="color:#c0392b">→</div>
+        </a>`;
+      }
     }catch(_e){ /* alerta é best-effort — se falhar, só não mostra */ }
+    if(chave === 'farmacia') carregarPendenciasFarmacia(token);
+  }
+
+  async function carregarPendenciasFarmacia(token){
+    try{
+      const hojeSP = new Date().toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'});
+      const dataSP = iso => { try{ return new Date(iso).toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'}); }catch(_e){ return ''; } };
+      const [prescricoes, adm] = await Promise.all([
+        api('prescricoes?select=morador_id,morador_nome,medicamento&ativo=eq.true').catch(()=>[]),
+        api('administracao_medicamentos?select=morador_id,medicamento,status,data_hora&order=data_hora.desc&limit=500').catch(()=>[])
+      ]);
+      if(token !== viewToken) return;
+      const admHoje = adm.filter(a => dataSP(a.data_hora) === hojeSP);
+      const foiDado = (med, mid) => admHoje.some(a => a.morador_id === mid && norm(a.medicamento) === norm(med) && norm(a.status).indexOf('adminis') >= 0);
+      const pendentes = {};
+      prescricoes.forEach(p=>{
+        if(!foiDado(p.medicamento, p.morador_id)){
+          if(!pendentes[p.morador_id]) pendentes[p.morador_id] = {nome:p.morador_nome, meds:[]};
+          pendentes[p.morador_id].meds.push(p.medicamento);
+        }
+      });
+      const lista = Object.keys(pendentes).map(id => ({id, nome:pendentes[id].nome, meds:pendentes[id].meds}));
+      const area = document.getElementById('setor-alerta-area');
+      if(!area || !lista.length) return;
+      const linhas = lista.map(m => `<a class="opcao" href="#medicacoes-${esc(m.id)}" style="border:2px solid #b8860b;background:#fff8e6">
+        <div class="ico" style="background:#fff;color:#b8860b">💊</div>
+        <div class="txt"><div class="nome">${esc(m.nome||'Morador')}</div><div class="desc">Pendente hoje: ${esc(m.meds.join(', '))}</div></div>
+        <div class="seta" style="color:#b8860b">→</div>
+      </a>`).join('');
+      area.insertAdjacentHTML('beforeend', `<div style="margin-bottom:2px;padding:10px 14px;background:#fff8e6;border:2px solid #b8860b;border-radius:12px;font-size:13px;color:#8a6000;font-weight:700">💊 ${lista.length} morador(es) com medicação pendente hoje — toque para abrir a ficha</div>${linhas}`);
+    }catch(_e){ /* pendências é best-effort */ }
   }
 
   function telaEstoqueBaixoSetor(chave){
