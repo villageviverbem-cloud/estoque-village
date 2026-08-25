@@ -222,7 +222,7 @@
   function atualizarSidebarAtiva(hashAtual){
     let grupo = hashAtual;
     if(hashAtual.indexOf('leitor-') === 0){ /* mantém o hash completo, casa com o sub-item */ }
-    else if(hashAtual.indexOf('morador') === 0 || ['registrar-agua-','registrar-fralda-','registrar-higiene-','registrar-decubito-','registrar-curativo-','registrar-evacuacao-','registrar-diurese-','registrar-mobilidade-','registrar-pele-','registrar-comportamento-','registrar-dor-','registrar-alimentacao-','registrar-intercorrencia-','anotacao-','vitais-','evolucao-','katz-','editar-katz-','lawton-','editar-lawton-','sae-','plano-','medicacoes-','administrar-'].some(p=>hashAtual.indexOf(p)===0)) grupo = 'moradores';
+    else if(hashAtual.indexOf('morador') === 0 || ['registrar-agua-','registrar-fralda-','registrar-higiene-','registrar-decubito-','registrar-curativo-','registrar-evacuacao-','registrar-diurese-','registrar-mobilidade-','registrar-pele-','registrar-comportamento-','registrar-dor-','registrar-alimentacao-','registrar-intercorrencia-','anotacao-','vitais-','evolucao-','katz-','editar-katz-','lawton-','editar-lawton-','sae-','plano-','medicacoes-','administrar-','relatorio-'].some(p=>hashAtual.indexOf(p)===0)) grupo = 'moradores';
     else if(hashAtual.indexOf('funcionarios') === 0) grupo = 'funcionarios';
     document.querySelectorAll('#sidebar [data-hash]').forEach(a=>{
       a.classList.toggle('ativo', a.dataset.hash === grupo);
@@ -1662,6 +1662,7 @@
       moradorNomeCache[m.id] = m.nome;
       document.getElementById('mf-nome').textContent = m.nome || '—';
       const acoes = [
+        {chave:'relatorio', hashBase:'relatorio', editavel:false, ico:'📄', bg:'#eaf7f0', cor:'#0AB287', nome:'Gerar Relatório (imprimir/PDF)', desc:'Sinais vitais, avaliações, medicações e intercorrências do período'},
         {chave:'medicacoes', hashBase:'medicacoes', editavel:false, ico:'💊', bg:'#eaf7f0', cor:'#1a6b4a', nome:'Medicações', desc:'Ver prescrições e marcar medicação administrada'},
         {chave:'intercorrencia', hashBase:'registrar-intercorrencia', editavel:false, ico:'🚨', bg:'#fdecec', cor:'#c0392b', nome:'Intercorrência', desc:'Registrar queda, evento ou ocorrência'},
         {chave:'agua', hashBase:'registrar-agua', editavel:false, ico:'💧', bg:'#eaf1fb', cor:'#4a6fa5', nome:'Bebeu água / Hidratação', desc:'Registrar copos de água'},
@@ -1708,6 +1709,102 @@
     }catch(e){
       if(token !== viewToken) return;
       document.getElementById('mf-area').innerHTML = '⚠️ Não consegui carregar a ficha.<br><small>('+esc(e.message)+')</small>';
+    }
+  }
+
+  // ---------- RELATÓRIO POR MORADOR ----------
+  function telaRelatorioMorador(moradorId){
+    const app = document.getElementById('app');
+    app.innerHTML = `
+      <div class="topo" style="background:linear-gradient(120deg,#00A6B9,#0AB287)">
+        <button class="voltar" onclick="location.hash='morador-${esc(moradorId)}'">← Voltar</button>
+        <h1>📄 Gerar Relatório</h1>
+        <p id="rm-nome" style="opacity:.9">Carregando...</p>
+      </div>
+      <div style="padding:18px 16px">
+        <label style="font-size:13px;color:var(--teal-esc);font-weight:600;display:block;margin-bottom:8px">Período do relatório</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+          <button class="rm-periodo" data-d="7" style="flex:1;padding:12px;border:2px solid #0AB287;background:#eafaf1;border-radius:10px;font-weight:700;cursor:pointer;color:#1a6b4a">7 dias</button>
+          <button class="rm-periodo" data-d="15" style="flex:1;padding:12px;border:1px solid var(--borda);background:#fff;border-radius:10px;font-weight:700;cursor:pointer">15 dias</button>
+          <button class="rm-periodo" data-d="30" style="flex:1;padding:12px;border:1px solid var(--borda);background:#fff;border-radius:10px;font-weight:700;cursor:pointer">30 dias</button>
+        </div>
+        <button id="rm-gerar" style="width:100%;padding:15px;border:none;border-radius:12px;background:linear-gradient(120deg,#00A6B9,#0AB287);color:#fff;font-size:16px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.12)">📄 Gerar Relatório (imprimir / PDF)</button>
+        <div id="rm-msg" style="margin-top:12px;font-size:13px;color:var(--muted)"></div>
+      </div>
+    `;
+    let periodo = 7;
+    document.querySelectorAll('.rm-periodo').forEach(b=>{
+      b.addEventListener('click', ()=>{
+        periodo = Number(b.dataset.d);
+        document.querySelectorAll('.rm-periodo').forEach(x=>{ x.style.border='1px solid var(--borda)'; x.style.background='#fff'; x.style.color='var(--txt)'; });
+        b.style.border='2px solid #0AB287'; b.style.background='#eafaf1'; b.style.color='#1a6b4a';
+      });
+    });
+    (async()=>{
+      const nome = await nomeDoMorador(moradorId);
+      const eln = document.getElementById('rm-nome'); if(eln) eln.textContent = nome;
+    })();
+    document.getElementById('rm-gerar').addEventListener('click', ()=> gerarRelatorioMorador(moradorId, periodo));
+  }
+
+  async function gerarRelatorioMorador(moradorId, dias){
+    const msg = document.getElementById('rm-msg');
+    if(msg) msg.textContent = 'Gerando relatório...';
+    try{
+      const corte = Date.now() - dias*86400000;
+      const noPeriodo = iso => { try{ return new Date(iso).getTime() >= corte; }catch(_e){ return false; } };
+      const fmtD = iso => { try{ return new Date(iso).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'}); }catch(_e){ return String(iso||''); } };
+      const v = x => (x===null||x===undefined||x==='') ? '—' : x;
+      const [mrows, sinais, katz, lawton, interc, evol] = await Promise.all([
+        api('moradores?select=*&id=eq.'+encodeURIComponent(moradorId)),
+        api('sinais_vitais?select=*&morador_id=eq.'+encodeURIComponent(moradorId)+'&order=data_hora.desc&limit=200').catch(()=>[]),
+        api('avaliacoes_katz?select=*&morador_id=eq.'+encodeURIComponent(moradorId)+'&order=data_hora.desc&limit=50').catch(()=>[]),
+        api('avaliacoes_lawton?select=*&morador_id=eq.'+encodeURIComponent(moradorId)+'&order=data_hora.desc&limit=50').catch(()=>[]),
+        api('intercorrencias?select=*&morador_id=eq.'+encodeURIComponent(moradorId)+'&order=data_hora.desc&limit=100').catch(()=>[]),
+        api('evolucoes?select=*&morador_id=eq.'+encodeURIComponent(moradorId)+'&order=data_hora.desc&limit=100').catch(()=>[])
+      ]);
+      const m = mrows[0] || {nome:'—'};
+      const sF = sinais.filter(r=>noPeriodo(r.data_hora));
+      const kF = katz.filter(r=>noPeriodo(r.data_hora));
+      const lF = lawton.filter(r=>noPeriodo(r.data_hora));
+      const iF = interc.filter(r=>noPeriodo(r.data_hora));
+      const eF = evol.filter(r=>noPeriodo(r.data_hora));
+
+      const sinaisHtml = sF.length ? `<table><tr><th>Quando</th><th>PA</th><th>Temp</th><th>SatO2</th><th>Glic</th><th>FC</th><th>Alertas</th></tr>${sF.map(s=>`<tr><td>${fmtD(s.data_hora)}</td><td>${v(s.pa_sistolica)}/${v(s.pa_diastolica)}</td><td>${v(s.temperatura)}</td><td>${v(s.sato2)}</td><td>${v(s.glicemia)}</td><td>${v(s.freq_cardiaca)}</td><td>${s.alertas?('⚠️ '+esc(s.alertas)):'—'}</td></tr>`).join('')}</table>` : '<p class="vazio">Nenhum registro no período.</p>';
+      const evolHtml = eF.length ? eF.map(e=>`<div class="reg"><b>${fmtD(e.data_hora)}</b>${e.funcionario_nome?(' — '+esc(e.funcionario_nome)):''}<br>${esc(e.texto||e.evolucao||e.observacao||'')}</div>`).join('') : '<p class="vazio">Nenhuma evolução no período.</p>';
+      const intercHtml = iF.length ? iF.map(i=>`<div class="reg"><b>${fmtD(i.data_hora)}</b> — ${esc(i.tipo||'—')} (${esc(i.gravidade||'—')})<br>${esc(i.descricao||i.observacao||'')}</div>`).join('') : '<p class="vazio">Nenhuma intercorrência no período.</p>';
+      const avalHtml = (kF.length||lF.length) ? `${kF.map(k=>`<div class="reg"><b>${fmtD(k.data_hora)}</b> — Escala de Katz: escore ${v(k.escore_total)}/6</div>`).join('')}${lF.map(l=>`<div class="reg"><b>${fmtD(l.data_hora)}</b> — Escala de Lawton: escore ${v(l.escore_total)}</div>`).join('')}` : '<p class="vazio">Nenhuma avaliação no período.</p>';
+
+      const agora = new Date().toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'});
+      const win = window.open('', '_blank');
+      win.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Relatório — ${esc(m.nome)}</title>
+        <style>
+          body{font-family:'Segoe UI',system-ui,sans-serif;color:#243b3a;padding:28px;max-width:820px;margin:0 auto}
+          h1{font-size:21px;color:#2f6f6e;border-bottom:3px solid #0AB287;padding-bottom:8px;margin-bottom:4px}
+          h2{font-size:15px;color:#2f6f6e;margin:22px 0 8px;border-left:4px solid #0AB287;padding-left:8px}
+          .cab{font-size:12px;color:#7d9a99;margin-bottom:8px}
+          table{width:100%;border-collapse:collapse;font-size:12px;margin-top:6px}
+          th,td{border:1px solid #e4eded;padding:6px 8px;text-align:left}
+          th{background:#f2f8f8;color:#2f6f6e}
+          .reg{border:1px solid #e4eded;border-radius:8px;padding:9px 12px;margin-bottom:8px;font-size:12.5px;line-height:1.5}
+          .vazio{color:#8a99a8;font-size:12.5px;font-style:italic}
+          .aviso{font-size:11px;color:#8a99a8;margin-top:24px;border-top:1px solid #e4eded;padding-top:12px}
+          .btn-print{background:#0AB287;color:#fff;border:none;border-radius:8px;padding:12px 20px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:18px}
+          @media print{ .btn-print{display:none} }
+        </style></head><body>
+        <button class="btn-print" onclick="window.print()">🖨️ Imprimir / Salvar PDF</button>
+        <h1>📋 Relatório do Residente</h1>
+        <div class="cab"><b>${esc(m.nome)}</b>${m.quarto?(' · Quarto '+esc(m.quarto)):''} · Período: últimos ${dias} dias · Gerado em ${agora}</div>
+        <h2>❤️ Sinais Vitais (${sF.length})</h2>${sinaisHtml}
+        <h2>📔 Evoluções (${eF.length})</h2>${evolHtml}
+        <h2>🚨 Intercorrências (${iF.length})</h2>${intercHtml}
+        <h2>📋 Avaliações (${kF.length+lF.length})</h2>${avalHtml}
+        <div class="aviso">Documento de apoio organizacional gerado pelo sistema Village Viver Bem. Não substitui os registros clínicos oficiais exigidos pela vigilância sanitária.</div>
+        </body></html>`);
+      win.document.close();
+      if(msg) msg.textContent = 'Relatório aberto em nova aba. Use o botão Imprimir / Salvar PDF.';
+    }catch(e){
+      if(msg){ msg.style.color='#c0392b'; msg.textContent = 'Erro ao gerar: '+e.message; }
     }
   }
 
@@ -3086,6 +3183,7 @@
     else if(hash === 'morador-novo') telaMoradorNovo();
     else if((m = apósPrefixo(hash, 'morador-editar-')) !== null) telaMoradorEditar(m);
     else if((m = apósPrefixo(hash, 'medicacoes-')) !== null) telaMedicacoes(m);
+    else if((m = apósPrefixo(hash, 'relatorio-')) !== null) telaRelatorioMorador(m);
     else if((m = apósPrefixo(hash, 'administrar-')) !== null) telaAdministrarMedicamento(m);
     else if((m = apósPrefixo(hash, 'registrar-intercorrencia-')) !== null) telaRegistrarIntercorrencia(m);
     else if(hash === 'intercorrencias') telaIntercorrencias();
