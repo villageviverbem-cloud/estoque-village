@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Visão Geral - Village Viver Bem Residencial Care</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#eef2f7;color:#1f2933}
+  .wrap{max-width:1000px;margin:0 auto;padding:24px 18px 60px}
+  h1{font-size:22px;color:#12384f;margin:0 0 4px}
+  .back{display:inline-block;margin-bottom:14px;color:#1a5276;text-decoration:none;font-size:14px;font-weight:600}
+  .back:hover{text-decoration:underline}
+  .sub{color:#7a8a99;font-size:13px;margin-bottom:20px}
+  h2{font-size:14px;text-transform:uppercase;letter-spacing:.5px;color:#52616b;margin:28px 0 12px;border-bottom:2px solid #d7dee5;padding-bottom:6px}
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px}
+  .card{display:block;text-decoration:none;background:#fff;border:1px solid #dbe2ea;border-radius:12px;padding:18px;border-left:5px solid #4aa3df;transition:.12s}
+  .card .num{font-size:32px;font-weight:800;color:#12384f;line-height:1}
+  .card .lbl{font-size:13px;color:#52616b;margin-top:6px}
+  .card.warn{border-left-color:#e67e22}
+  .card.warn .num{color:#b9770e}
+  .card.danger{border-left-color:#c0392b}
+  .card.danger .num{color:#c0392b}
+  .card.ok{border-left-color:#1e8449}
+  .card.ok .num{color:#1e8449}
+  table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #dbe2ea;border-radius:10px;overflow:hidden;font-size:13px}
+  th{background:#eef2f7;text-align:left;padding:9px 11px;color:#52616b;font-weight:600}
+  td{padding:9px 11px;border-top:1px solid #eef2f7;vertical-align:top}
+  tr.warn td{background:#fdf3f2}
+  .empty{color:#8a99a8;font-style:italic;padding:10px 2px}
+  .tag{display:inline-block;padding:2px 8px;border-radius:10px;font-size:12px;font-weight:600}
+  .t-grave{background:#fdecea;color:#c0392b}
+  .t-moderada{background:#fef5e7;color:#b9770e}
+  .t-leve{background:#eafaf1;color:#1e8449}
+  .t-venc{background:#fdecea;color:#c0392b}
+  .t-prox{background:#fef5e7;color:#b9770e}
+  .gcols{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}
+  .gcol{background:#fff;border:1px solid #dbe2ea;border-radius:12px;overflow:hidden}
+  .gcol .gh{padding:12px 16px;color:#fff;font-weight:700;font-size:15px;display:flex;justify-content:space-between;align-items:center}
+  .gcol.men .gh{background:#1a5276}
+  .gcol.women .gh{background:#c2185b}
+  .gcol.outros .gh{background:#52616b}
+  .gcol ul{list-style:none;margin:0;padding:0}
+  .gcol li{padding:9px 16px;border-top:1px solid #eef2f7;font-size:14px}
+  .gcol.men li{border-left:4px solid #4aa3df}
+  .gcol.women li{border-left:4px solid #ec407a}
+  .gcol.outros li{border-left:4px solid #b0bac4}
+  .gcol li a{text-decoration:none;color:#1f2933;font-weight:600}
+  .totalbar{margin-top:22px;background:#12384f;color:#fff;border-radius:12px;padding:16px 20px;text-align:center;font-size:17px;font-weight:700}
+  .alertbox{background:#fdecea;border:1px solid #f2b8b0;color:#c0392b;padding:12px 16px;border-radius:10px;margin-bottom:14px;font-weight:600}
+  .estado{padding:40px;text-align:center;color:#7a8a99}
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <div class="estado">Carregando painel...</div>
+</div>
+<script>
+const SUPABASE_URL = 'https://ilssyjyabxgtwwodbzpz.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_eyYyLvibu5i4bZMAzcDTCg_Hn2Oea6j';
+
+function esc(s){ return (s===undefined||s===null?'':String(s)).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function norm(s){ return (s||'').toString().trim().toLowerCase(); }
+async function api(caminho){
+  const r = await fetch(SUPABASE_URL + '/rest/v1/' + caminho, { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } });
+  if(!r.ok) throw new Error('Erro ' + r.status + ' ao buscar ' + caminho);
+  return r.json();
+}
+const num = (v) => { const n = Number(v); return isNaN(n) ? null : n; };
+const daysUntil = (d) => { if(!d) return null; const t = new Date(d); if(isNaN(t)) return null; return Math.floor((t - new Date()) / 86400000); };
+const fmtD = (d) => { if(!d) return '-'; const t=new Date(d); return isNaN(t)?String(d):t.toLocaleDateString('pt-BR',{timeZone:'America/Sao_Paulo'}); };
+const fmt = (d) => { if(!d) return '-'; const t=new Date(d); return isNaN(t)?String(d):t.toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'}); };
+const spDate = (d) => { try { return new Date(d).toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'}); } catch(e){ return ''; } };
+const fmtDataSimples = (iso) => { const p = String(iso).split('-'); return p.length===3 ? (p[2]+'/'+p[1]+'/'+p[0]) : String(iso); };
+const addDays = (iso, delta) => { const p = String(iso).split('-').map(Number); const d = new Date(Date.UTC(p[0], p[1]-1, p[2])); d.setUTCDate(d.getUTCDate() + delta); return d.toISOString().slice(0,10); };
+
+function qs(){
+  const p = new URLSearchParams(location.search);
+  return { data: p.get('data') || '' };
+}
+
+async function montar(){
+  const q = qs();
+  const [residentes, sinais, intercorrencias, farmacia, cuidados, admMed, prescricoesTodas, katzTodas, lawtonTodas] = await Promise.all([
+    api('moradores?select=*'),
+    api('sinais_vitais?select=*&order=data_hora.desc&limit=500'),
+    api('intercorrencias?select=*&order=data_hora.desc&limit=200'),
+    api('estoque_farmacia?select=*'),
+    api('registros_cuidado?select=*&order=data_hora.desc&limit=1000'),
+    api('administracao_medicamentos?select=*&order=data_hora.desc&limit=1000'),
+    api('prescricoes?select=*'),
+    api('avaliacoes_katz?select=*&order=data_hora.desc&limit=500').catch(()=>[]),
+    api('avaliacoes_lawton?select=*&order=data_hora.desc&limit=500').catch(()=>[])
+  ]);
+
+  const totalRes = residentes.length;
+  const ativos = residentes.filter(r => r.ativo !== false).length;
+
+  const seteDias = Date.now() - 7*86400000;
+  // Só o ÚLTIMO sinal de cada morador conta: se a medição mais recente (7 dias) tem alerta, mostra.
+  const ultimoSinalMor = {};
+  sinais.forEach(r=>{
+    const t = new Date(r.data_hora).getTime();
+    if(t < seteDias) return;
+    if(!ultimoSinalMor[r.morador_id] || t > new Date(ultimoSinalMor[r.morador_id].data_hora).getTime()){
+      ultimoSinalMor[r.morador_id] = r;
+    }
+  });
+  const sinaisAlerta = Object.values(ultimoSinalMor)
+    .filter(r => r.alertas && String(r.alertas).trim())
+    .sort((a,b)=>new Date(b.data_hora)-new Date(a.data_hora));
+
+  const abertas = intercorrencias.filter(r => { const s = norm(r.status); return s !== 'resolvida' && s !== 'resolvido' && s !== 'fechada' && s !== 'fechado' && s !== 'concluida' && s !== 'concluída'; })
+    .sort((a,b)=>new Date(b.data_hora)-new Date(a.data_hora));
+  const gravesAbertas = abertas.filter(r => norm(r.gravidade) === 'grave').length;
+
+  const baixoFarm = farmacia.filter(r => { const qd=num(r.quantidade), m=num(r.quantidade_minima); return qd!==null && m!==null && qd <= m; });
+  const validades = farmacia.map(r => ({...r, _d: daysUntil(r.validade)})).filter(r => r._d !== null && r._d <= 30).sort((a,b)=>a._d-b._d);
+  const vencidos = validades.filter(r => r._d < 0).length;
+
+  const genderOf = (g) => { const x = norm(g); if (x.indexOf('masc')===0 || x.indexOf('homem')>=0) return 'M'; if (x.indexOf('femin')===0 || x.indexOf('mulher')>=0) return 'F'; return 'O'; };
+  const byName = (a,b) => norm(a.nome).localeCompare(norm(b.nome));
+  const homens = residentes.filter(r => genderOf(r.sexo)==='M').sort(byName);
+  const mulheres = residentes.filter(r => genderOf(r.sexo)==='F').sort(byName);
+  const outros = residentes.filter(r => genderOf(r.sexo)==='O').sort(byName);
+  const genLink = (r) => `<li><a href="app.html#morador-${encodeURIComponent(r.id)}">${esc(r.nome||'(sem nome)')}${r.quarto?` <small style="color:#8a99a8">· ${esc(r.quarto)}</small>`:''}</a></li>`;
+  const menCol = `<div class="gcol men"><div class="gh"><span>👨 Homens</span><span>${homens.length}</span></div><ul>${homens.map(genLink).join('') || '<li class="empty" style="padding:10px 16px">Nenhum</li>'}</ul></div>`;
+  const womenCol = `<div class="gcol women"><div class="gh"><span>👩 Mulheres</span><span>${mulheres.length}</span></div><ul>${mulheres.map(genLink).join('') || '<li class="empty" style="padding:10px 16px">Nenhum</li>'}</ul></div>`;
+  const outrosCol = outros.length ? `<div class="gcol outros"><div class="gh"><span>❔ Não informado</span><span>${outros.length}</span></div><ul>${outros.map(genLink).join('')}</ul></div>` : '';
+  const totalBar = `<div class="totalbar">👥 Total: ${totalRes} ${totalRes===1?'cliente':'clientes'} · ${homens.length} ${homens.length===1?'homem':'homens'} · ${mulheres.length} ${mulheres.length===1?'mulher':'mulheres'}${outros.length?(' · '+outros.length+' não informado'):''}</div>`;
+
+  const card = (cls, n, lbl) => `<div class="card ${cls}"><div class="num">${n}</div><div class="lbl">${lbl}</div></div>`;
+
+  const alertaTbl = sinaisAlerta.length
+    ? `<table><tr><th>Residente</th><th>Quando</th><th>PA</th><th>Temp</th><th>SatO2</th><th>Glic</th><th>Alertas</th><th></th></tr>${sinaisAlerta.slice(0,10).map(r=>`<tr class="warn"><td>${esc(r.morador_nome)}</td><td>${fmt(r.data_hora)}</td><td>${r.pa_sistolica!=null?esc(r.pa_sistolica):''}${(r.pa_sistolica!=null||r.pa_diastolica!=null)?'/':''}${r.pa_diastolica!=null?esc(r.pa_diastolica):''}</td><td>${r.temperatura!=null?esc(r.temperatura)+'°':''}</td><td>${r.sato2!=null?esc(r.sato2)+'%':''}</td><td>${r.glicemia!=null?esc(r.glicemia):''}</td><td>${esc(r.alertas)}</td><td><a href="app.html#vitais-${encodeURIComponent(r.morador_id)}" style="white-space:nowrap">✓ Registrar medição →</a></td></tr>`).join('')}</table>`
+    : '<div class="empty">Nenhum alerta de sinais vitais nos últimos 7 dias.</div>';
+
+  const tagSev = (sev)=>{ const x=norm(sev); const c = x==='grave'?'t-grave':x==='moderada'?'t-moderada':'t-leve'; return `<span class="tag ${c}">${esc(sev||'-')}</span>`; };
+  const icTbl = abertas.length
+    ? `<table><tr><th>Residente</th><th>Quando</th><th>Tipo</th><th>Gravidade</th><th>Local</th><th>Status</th></tr>${abertas.slice(0,10).map(r=>`<tr><td>${esc(r.morador_nome)}</td><td>${fmt(r.data_hora)}</td><td>${esc(r.tipo)}</td><td>${tagSev(r.gravidade)}</td><td>${esc(r.local)}</td><td>${esc(r.status||'aberta')}</td></tr>`).join('')}</table>`
+    : '<div class="empty">Nenhuma intercorrência aberta. 🎉</div>';
+
+  const baixoTbl = baixoFarm.length
+    ? `<table><tr><th>Item</th><th>Atual</th><th>Mínimo</th></tr>${baixoFarm.map(r=>`<tr class="warn"><td>${esc(r.nome_item)}</td><td>${esc(r.quantidade)} ${esc(r.unidade||'')}</td><td>${esc(r.quantidade_minima)} ${esc(r.unidade||'')}</td></tr>`).join('')}</table>`
+    : '<div class="empty">Nenhum item abaixo do estoque mínimo. 👍</div>';
+
+  const validTbl = validades.length
+    ? `<table><tr><th>Item</th><th>Validade</th><th>Situação</th></tr>${validades.slice(0,12).map(r=>{ const venc = r._d < 0; const tag = venc?`<span class="tag t-venc">Vencido há ${Math.abs(r._d)}d</span>`:`<span class="tag t-prox">Vence em ${r._d}d</span>`; return `<tr class="${venc?'warn':''}"><td>${esc(r.nome_item)}</td><td>${fmtD(r.validade)}</td><td>${tag}</td></tr>`; }).join('')}</table>`
+    : '<div class="empty">Nenhum item vencendo nos próximos 30 dias.</div>';
+
+  const agora = new Date().toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'});
+  const todaySP = new Date().toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'});
+  const DATA_SEL = String(q.data || todaySP).trim();
+  const ehHoje = DATA_SEL === todaySP;
+  const dataAnterior = addDays(DATA_SEL, -1);
+  const dataProxima = addDays(DATA_SEL, 1);
+
+  const ativosLista = residentes.filter(r => r.ativo !== false).sort(byName);
+  const medAdministradoNoDia = (medName, admDia) => admDia.some(a => norm(a.medicamento) === norm(medName) && norm(a.status).indexOf('adminis') >= 0);
+
+  const ultimaAvaliacao = (lista, moradorId) => lista.find(a => String(a.morador_id) === String(moradorId));
+  const plantaoLinhas = ativosLista.map(r => {
+    const cuDia = cuidados.filter(c => c.morador_id === r.id && spDate(c.data_hora) === DATA_SEL);
+    const admDia = admMed.filter(a => a.morador_id === r.id && spDate(a.data_hora) === DATA_SEL);
+    const prAtivas = prescricoesTodas.filter(p => p.morador_id === r.id && p.ativo !== false);
+    const medPend = prAtivas.filter(p => !medAdministradoNoDia(p.medicamento, admDia));
+    const semNenhumRegistro = cuDia.length === 0 && admDia.length === 0;
+    const icAberta = abertas.some(i => String(i.morador_id) === String(r.id));
+    const katz = ultimaAvaliacao(katzTodas, r.id);
+    const lawton = ultimaAvaliacao(lawtonTodas, r.id);
+    return { nome: r.nome, quarto: r.quarto, id: r.id, cuDia, admDia, prAtivas, medPend, semNenhumRegistro, icAberta, katz, lawton };
+  });
+  const comMedPendente = plantaoLinhas.filter(r => r.medPend.length > 0);
+  const semRegistroHoje = plantaoLinhas.filter(r => r.semNenhumRegistro);
+
+  const tipoBadges = (cuDia) => {
+    if (!cuDia.length) return '<span class="tag t-venc">Nenhum registro</span>';
+    const tipos = {};
+    cuDia.forEach(c => { tipos[c.tipo] = (tipos[c.tipo]||0) + 1; });
+    return Object.keys(tipos).map(t => `<span class="tag t-leve">${esc(t)}${tipos[t]>1?(' x'+tipos[t]):''}</span>`).join(' ');
+  };
+  const medBadge = (linha) => {
+    if (!linha.prAtivas.length) return '<span class="empty" style="font-style:normal;color:#8a99a8">sem prescrição ativa</span>';
+    if (!linha.medPend.length) return `<span class="tag t-leve">✅ ${linha.admDia.length}/${linha.prAtivas.length}</span>`;
+    return `<span class="tag t-venc">⏳ faltam ${linha.medPend.length}: ${linha.medPend.map(p=>esc(p.medicamento)).join(', ')}</span>`;
+  };
+  const avaliacaoBadges = (linha) => {
+    const partes = [];
+    if (linha.icAberta) partes.push('<span class="tag t-grave">🚨 intercorrência aberta</span>');
+    if (linha.katz) partes.push(`<span class="tag t-leve">Katz ${esc(linha.katz.escore_total ?? '—')}/6</span>`);
+    if (linha.lawton) partes.push(`<span class="tag t-leve">Lawton ${esc(linha.lawton.escore_total ?? '—')}</span>`);
+    return partes.join(' ') || '<span class="empty" style="font-style:normal;color:#8a99a8">sem avaliação</span>';
+  };
+
+  const plantaoTbl = plantaoLinhas.length
+    ? `<table><tr><th>Residente</th><th>Cuidados registrados</th><th>Medicações</th><th>Avaliações</th><th></th></tr>${plantaoLinhas.map(r => `<tr${(r.semNenhumRegistro||r.medPend.length||r.icAberta)?' class="warn"':''}>`
+        + `<td><b>${esc(r.nome)}</b>${r.quarto?(' <small style="color:#8a99a8">· '+esc(r.quarto)+'</small>'):''}</td>`
+        + `<td>${tipoBadges(r.cuDia)}</td>`
+        + `<td>${medBadge(r)}</td>`
+        + `<td>${avaliacaoBadges(r)}</td>`
+        + `<td><a href="app.html#morador-${encodeURIComponent(r.id)}">Abrir →</a></td>`
+        + `</tr>`).join('')}</table>`
+    : '<div class="empty">Nenhum residente ativo.</div>';
+
+  const plantaoNav = `<div style="display:flex;align-items:center;gap:10px;margin:6px 0 14px;flex-wrap:wrap">`
+    + `<a class="back" href="?data=${dataAnterior}">← Dia anterior</a>`
+    + `<b>${fmtDataSimples(DATA_SEL)}${ehHoje?' (hoje)':''}</b>`
+    + (ehHoje ? '' : `<a class="back" href="?data=${dataProxima}">Próximo dia →</a>`)
+    + (ehHoje ? '' : `<a class="back" href="painel.html">Ir para hoje</a>`)
+    + `</div>`;
+
+  const plantaoAlerta = (comMedPendente.length || semRegistroHoje.length)
+    ? `<div class="alertbox">⚠️ ${comMedPendente.length} residente(s) com medicação pendente e ${semRegistroHoje.length} sem nenhum registro ${ehHoje?'hoje':'nesse dia'}.</div>`
+    : `<div class="empty" style="color:#1e8449;font-weight:600;font-style:normal">👍 Todos os residentes com cuidados em dia.</div>`;
+
+  document.getElementById('app').innerHTML = `
+    <a class="back" href="app.html#inicio">← Voltar ao Início</a>
+    <h1>📊 Visão Geral</h1>
+    <div class="sub">Village Viver Bem Residencial-care · Atualizado em ${agora}</div>
+
+    <div style="margin:14px 0" class="no-print">
+      <button onclick="gerarRelatorio()" style="background:linear-gradient(120deg,#00A6B9,#0AB287);color:#fff;border:none;border-radius:12px;padding:14px 22px;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.12)">📄 Gerar Relatório Completo (imprimir)</button>
+      <span style="display:block;font-size:12px;color:#7d9a99;margin-top:6px">Relatório de todos os residentes: sinais vitais, medicações, intercorrências e avaliações — pronto pra imprimir.</span>
+    </div>
+
+    <h2>Indicadores</h2>
+    <div class="cards">
+      ${card('ok', ativos, 'Residentes ativos')}
+      ${card('', totalRes, 'Total cadastrados')}
+      ${card(sinaisAlerta.length?'danger':'ok', sinaisAlerta.length, 'Alertas de sinais vitais (7d)')}
+      ${card(abertas.length?'warn':'ok', abertas.length, 'Intercorrências abertas')}
+      ${card(gravesAbertas?'danger':'ok', gravesAbertas, 'Intercorrências graves abertas')}
+      ${card(baixoFarm.length?'warn':'ok', baixoFarm.length, 'Itens com estoque baixo')}
+      ${card(validades.length?'warn':'ok', validades.length, 'Validades próximas (30d)')}
+      ${card(vencidos?'danger':'ok', vencidos, 'Itens vencidos')}
+    </div>
+
+    <h2>🗂️ Quadro do Plantão — Cuidados do Dia</h2>
+    ${plantaoNav}
+    ${plantaoAlerta}
+    ${plantaoTbl}
+
+    <h2>👥 Residentes por Sexo</h2>
+    <div class="gcols">${menCol}${womenCol}${outrosCol}</div>
+
+    <h2>❤️ Alertas de Sinais Vitais (7 dias)</h2>${alertaTbl}
+    <h2>🚨 Intercorrências Abertas</h2>${icTbl}
+    <h2>📦 Estoque Baixo</h2>${baixoTbl}
+    <h2>⏰ Validades Próximas</h2>${validTbl}
+
+    ${totalBar}
+  `;
+}
+
+montar().catch(e => {
+  document.getElementById('app').innerHTML = '<div class="estado">⚠️ Não consegui carregar o painel.<br><small>(' + esc(e.message) + ')</small></div>';
+});
+
+async function gerarRelatorio(){
+  const btnArea = document.querySelector('.no-print');
+  if(btnArea) btnArea.insertAdjacentHTML('beforeend', '<div id="rel-loading" style="margin-top:10px;color:#0AB287;font-weight:600">Gerando relatório...</div>');
+  try{
+    const [residentes, sinais, intercorrencias, admMed, prescricoes, katz, lawton] = await Promise.all([
+      api('moradores?select=*'),
+      api('sinais_vitais?select=*&order=data_hora.desc&limit=1000'),
+      api('intercorrencias?select=*&order=data_hora.desc&limit=500'),
+      api('administracao_medicamentos?select=*&order=data_hora.desc&limit=1000').catch(()=>[]),
+      api('prescricoes?select=*').catch(()=>[]),
+      api('avaliacoes_katz?select=*&order=data_hora.desc&limit=500').catch(()=>[]),
+      api('avaliacoes_lawton?select=*&order=data_hora.desc&limit=500').catch(()=>[])
+    ]);
+    const ativos = residentes.filter(r => r.ativo !== false).sort((a,b)=>norm(a.nome).localeCompare(norm(b.nome)));
+    const agora = new Date().toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'});
+    const ultimo = (lista, mid) => lista.find(x => String(x.morador_id) === String(mid));
+    const paTxt = s => (s && (s.pa_sistolica!=null||s.pa_diastolica!=null)) ? ((s.pa_sistolica??'—')+'/'+(s.pa_diastolica??'—')) : '—';
+
+    let corpo = ativos.map(r=>{
+      const s = ultimo(sinais, r.id);
+      const prAtivas = prescricoes.filter(p => String(p.morador_id)===String(r.id) && p.ativo !== false);
+      const icAbertas = intercorrencias.filter(i => String(i.morador_id)===String(r.id) && ['resolvida','resolvido','fechada','fechado','concluida','concluída'].indexOf(norm(i.status))===-1);
+      const k = ultimo(katz, r.id), l = ultimo(lawton, r.id);
+      const sinaisTxt = s
+        ? `PA ${paTxt(s)} · Temp ${s.temperatura??'—'}° · SatO2 ${s.sato2??'—'}% · Glic ${s.glicemia??'—'}${s.alertas?` · ⚠️ <b>${esc(s.alertas)}</b>`:''} <small>(${fmt(s.data_hora)})</small>`
+        : 'Sem registro de sinais vitais.';
+      const medTxt = prAtivas.length
+        ? '<ul style="margin:4px 0 0;padding-left:18px">'+prAtivas.map(p=>`<li>${esc(p.medicamento)}${p.dose?` — ${esc(p.dose)}`:''}${p.horario?` — ${esc(p.horario)}`:''}</li>`).join('')+'</ul>'
+        : 'Sem prescrição ativa.';
+      const icTxt = icAbertas.length
+        ? '<ul style="margin:4px 0 0;padding-left:18px">'+icAbertas.map(i=>`<li>${esc(i.tipo||'—')} (${esc(i.gravidade||'—')}) — ${fmt(i.data_hora)}</li>`).join('')+'</ul>'
+        : 'Nenhuma intercorrência aberta.';
+      const avalTxt = [k?`Katz ${k.escore_total??'—'}/6`:null, l?`Lawton ${l.escore_total??'—'}`:null].filter(Boolean).join(' · ') || 'Sem avaliação registrada.';
+      return `<div class="rel-morador">
+        <h3>${esc(r.nome||'(sem nome)')}${r.quarto?` — Quarto ${esc(r.quarto)}`:''}</h3>
+        <p><b>Sinais vitais (último):</b> ${sinaisTxt}</p>
+        <p><b>Medicações ativas:</b> ${medTxt}</p>
+        <p><b>Intercorrências abertas:</b> ${icTxt}</p>
+        <p><b>Avaliações:</b> ${esc(avalTxt)}</p>
+      </div>`;
+    }).join('');
+
+    const win = window.open('', '_blank');
+    win.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Relatório — Village Viver Bem</title>
+      <style>
+        body{font-family:'Segoe UI',system-ui,sans-serif;color:#243b3a;padding:30px;max-width:800px;margin:0 auto}
+        h1{font-size:22px;color:#2f6f6e;border-bottom:3px solid #0AB287;padding-bottom:8px}
+        .cab{font-size:12px;color:#7d9a99;margin-bottom:20px}
+        .rel-morador{border:1px solid #e4eded;border-radius:10px;padding:14px 16px;margin-bottom:14px;page-break-inside:avoid}
+        .rel-morador h3{font-size:16px;color:#2f6f6e;margin:0 0 8px}
+        .rel-morador p{font-size:13px;margin:6px 0;line-height:1.5}
+        .aviso{font-size:11px;color:#8a99a8;margin-top:24px;border-top:1px solid #e4eded;padding-top:12px}
+        @media print{ .btn-print{display:none} }
+        .btn-print{background:#0AB287;color:#fff;border:none;border-radius:8px;padding:12px 20px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:20px}
+      </style></head><body>
+      <button class="btn-print" onclick="window.print()">🖨️ Imprimir / Salvar PDF</button>
+      <h1>📋 Relatório Geral de Residentes</h1>
+      <div class="cab">Village Viver Bem · Residencial Care · Gerado em ${agora} · ${ativos.length} residente(s) ativo(s)</div>
+      ${corpo || '<p>Nenhum residente ativo.</p>'}
+      <div class="aviso">Documento de apoio organizacional gerado automaticamente pelo sistema. Não substitui os registros clínicos oficiais exigidos pela vigilância sanitária.</div>
+      </body></html>`);
+    win.document.close();
+    const ld = document.getElementById('rel-loading'); if(ld) ld.remove();
+  }catch(e){
+    const ld = document.getElementById('rel-loading');
+    if(ld){ ld.style.color='#c0392b'; ld.textContent = 'Erro ao gerar: '+e.message; }
+  }
+}
+</script>
+</body>
+</html>
