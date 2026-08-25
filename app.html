@@ -941,8 +941,20 @@
     const token = viewToken;
     document.getElementById('quando').textContent = 'Atualizando...';
     try{
-      const moradores = await api('moradores?select=*&order=nome');
+      const dataSP2 = iso => { try{ return new Date(iso).getTime(); }catch(_e){ return 0; } };
+      const seteDias = Date.now() - 7*86400000;
+      const [moradores, sinaisAlerta] = await Promise.all([
+        api('moradores?select=*&order=nome'),
+        api('sinais_vitais?select=morador_id,alertas,data_hora&order=data_hora.desc&limit=300').catch(()=>[])
+      ]);
       if(token !== viewToken) return;
+      // Moradores que têm sinal vital com alerta nos últimos 7 dias
+      const alertaPorMorador = {};
+      sinaisAlerta.forEach(s=>{
+        if(s.alertas && String(s.alertas).trim() && dataSP2(s.data_hora) >= seteDias){
+          if(!alertaPorMorador[s.morador_id]) alertaPorMorador[s.morador_id] = String(s.alertas).trim();
+        }
+      });
       const el = document.getElementById('lista');
       document.getElementById('contador').textContent = moradores.length + (moradores.length===1?' morador':' moradores');
       const souAdmin = !!(funcionarioAtual() && funcionarioAtual().admin);
@@ -954,14 +966,18 @@
           const nome = (m.nome||'—').toString().trim();
           const quarto = m.quarto ? ('Quarto ' + esc(String(m.quarto).trim())) : 'Sem quarto';
           const arquivado = m.ativo === false;
+          const temAlerta = alertaPorMorador[m.id];
           const acoesAdmin = souAdmin ? `
             <a href="#morador-editar-${esc(m.id)}" class="js-morador-editar" data-id="${esc(m.id)}" data-stop="1" style="padding:8px 8px;color:var(--muted)" title="Editar">✏️</a>
             <a href="#" class="js-morador-arquivar" data-id="${esc(m.id)}" data-ativo="${arquivado?'0':'1'}" data-nome="${esc(nome)}" data-stop="1" style="padding:8px 8px;color:var(--muted)" title="${arquivado?'Reativar':'Arquivar'}">${arquivado?'♻️':'🗄️'}</a>
             <a href="#" class="js-morador-excluir" data-id="${esc(m.id)}" data-nome="${esc(nome)}" data-stop="1" style="padding:8px 8px;color:#c0392b" title="Excluir permanentemente">🗑️</a>
           ` : '';
-          html += `<div class="morador js-morador" data-id="${esc(m.id)}" style="cursor:pointer${arquivado?';opacity:.55':''}">
-            <div class="av">${esc(iniciais(nome))}</div>
-            <div style="flex:1"><div class="nome">${esc(nome)}${arquivado?' <span style="font-size:10.5px;color:var(--muted);font-weight:700">· ARQUIVADO</span>':''}</div><div class="quarto">🚪 ${quarto}</div></div>
+          html += `<div class="morador js-morador" data-id="${esc(m.id)}" style="cursor:pointer${arquivado?';opacity:.55':''}${temAlerta?';border:2px solid #e05a5a;background:#fff6f6':''}">
+            <div class="av"${temAlerta?' style="background:linear-gradient(135deg,#e05a5a,#c0392b)"':''}>${esc(iniciais(nome))}</div>
+            <div style="flex:1"><div class="nome">${esc(nome)}${arquivado?' <span style="font-size:10.5px;color:var(--muted);font-weight:700">· ARQUIVADO</span>':''}</div>
+              <div class="quarto">🚪 ${quarto}</div>
+              ${temAlerta?`<div style="font-size:11.5px;color:#c0392b;font-weight:700;margin-top:3px">🔴 Alerta: ${esc(temAlerta)}</div>`:''}
+            </div>
             <a class="btn-scan" href="#leitor-farmacia" data-stop="1">📷 Ler código</a>
             ${acoesAdmin}
           </div>`;
