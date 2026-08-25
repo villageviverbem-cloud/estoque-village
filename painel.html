@@ -122,7 +122,7 @@ async function montar(){
   const card = (cls, n, lbl) => `<div class="card ${cls}"><div class="num">${n}</div><div class="lbl">${lbl}</div></div>`;
 
   const alertaTbl = sinaisAlerta.length
-    ? `<table><tr><th>Residente</th><th>Quando</th><th>PA</th><th>Temp</th><th>SatO2</th><th>Glic</th><th>Alertas</th></tr>${sinaisAlerta.slice(0,10).map(r=>`<tr class="warn"><td>${esc(r.morador_nome)}</td><td>${fmt(r.data_hora)}</td><td>${esc(r.systolic)}/${esc(r.diastolic)}</td><td>${esc(r.temperature)}</td><td>${esc(r.oxygen_saturation)}</td><td>${esc(r.glucose)}</td><td>${esc(r.alertas)}</td></tr>`).join('')}</table>`
+    ? `<table><tr><th>Residente</th><th>Quando</th><th>PA</th><th>Temp</th><th>SatO2</th><th>Glic</th><th>Alertas</th></tr>${sinaisAlerta.slice(0,10).map(r=>`<tr class="warn"><td>${esc(r.morador_nome)}</td><td>${fmt(r.data_hora)}</td><td>${r.pa_sistolica!=null?esc(r.pa_sistolica):''}${(r.pa_sistolica!=null||r.pa_diastolica!=null)?'/':''}${r.pa_diastolica!=null?esc(r.pa_diastolica):''}</td><td>${r.temperatura!=null?esc(r.temperatura)+'°':''}</td><td>${r.sato2!=null?esc(r.sato2)+'%':''}</td><td>${r.glicemia!=null?esc(r.glicemia):''}</td><td>${esc(r.alertas)}</td></tr>`).join('')}</table>`
     : '<div class="empty">Nenhum alerta de sinais vitais nos últimos 7 dias.</div>';
 
   const tagSev = (sev)=>{ const x=norm(sev); const c = x==='grave'?'t-grave':x==='moderada'?'t-moderada':'t-leve'; return `<span class="tag ${c}">${esc(sev||'-')}</span>`; };
@@ -208,6 +208,11 @@ async function montar(){
     <h1>📊 Visão Geral</h1>
     <div class="sub">Village Viver Bem Residencial-care · Atualizado em ${agora}</div>
 
+    <div style="margin:14px 0" class="no-print">
+      <button onclick="gerarRelatorio()" style="background:linear-gradient(120deg,#00A6B9,#0AB287);color:#fff;border:none;border-radius:12px;padding:14px 22px;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.12)">📄 Gerar Relatório Completo (imprimir)</button>
+      <span style="display:block;font-size:12px;color:#7d9a99;margin-top:6px">Relatório de todos os residentes: sinais vitais, medicações, intercorrências e avaliações — pronto pra imprimir.</span>
+    </div>
+
     <h2>Indicadores</h2>
     <div class="cards">
       ${card('ok', ativos, 'Residentes ativos')}
@@ -240,6 +245,75 @@ async function montar(){
 montar().catch(e => {
   document.getElementById('app').innerHTML = '<div class="estado">⚠️ Não consegui carregar o painel.<br><small>(' + esc(e.message) + ')</small></div>';
 });
+
+async function gerarRelatorio(){
+  const btnArea = document.querySelector('.no-print');
+  if(btnArea) btnArea.insertAdjacentHTML('beforeend', '<div id="rel-loading" style="margin-top:10px;color:#0AB287;font-weight:600">Gerando relatório...</div>');
+  try{
+    const [residentes, sinais, intercorrencias, admMed, prescricoes, katz, lawton] = await Promise.all([
+      api('moradores?select=*'),
+      api('sinais_vitais?select=*&order=data_hora.desc&limit=1000'),
+      api('intercorrencias?select=*&order=data_hora.desc&limit=500'),
+      api('administracao_medicamentos?select=*&order=data_hora.desc&limit=1000').catch(()=>[]),
+      api('prescricoes?select=*').catch(()=>[]),
+      api('avaliacoes_katz?select=*&order=data_hora.desc&limit=500').catch(()=>[]),
+      api('avaliacoes_lawton?select=*&order=data_hora.desc&limit=500').catch(()=>[])
+    ]);
+    const ativos = residentes.filter(r => r.ativo !== false).sort((a,b)=>norm(a.nome).localeCompare(norm(b.nome)));
+    const agora = new Date().toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'});
+    const ultimo = (lista, mid) => lista.find(x => String(x.morador_id) === String(mid));
+    const paTxt = s => (s && (s.pa_sistolica!=null||s.pa_diastolica!=null)) ? ((s.pa_sistolica??'—')+'/'+(s.pa_diastolica??'—')) : '—';
+
+    let corpo = ativos.map(r=>{
+      const s = ultimo(sinais, r.id);
+      const prAtivas = prescricoes.filter(p => String(p.morador_id)===String(r.id) && p.ativo !== false);
+      const icAbertas = intercorrencias.filter(i => String(i.morador_id)===String(r.id) && ['resolvida','resolvido','fechada','fechado','concluida','concluída'].indexOf(norm(i.status))===-1);
+      const k = ultimo(katz, r.id), l = ultimo(lawton, r.id);
+      const sinaisTxt = s
+        ? `PA ${paTxt(s)} · Temp ${s.temperatura??'—'}° · SatO2 ${s.sato2??'—'}% · Glic ${s.glicemia??'—'}${s.alertas?` · ⚠️ <b>${esc(s.alertas)}</b>`:''} <small>(${fmt(s.data_hora)})</small>`
+        : 'Sem registro de sinais vitais.';
+      const medTxt = prAtivas.length
+        ? '<ul style="margin:4px 0 0;padding-left:18px">'+prAtivas.map(p=>`<li>${esc(p.medicamento)}${p.dose?` — ${esc(p.dose)}`:''}${p.horario?` — ${esc(p.horario)}`:''}</li>`).join('')+'</ul>'
+        : 'Sem prescrição ativa.';
+      const icTxt = icAbertas.length
+        ? '<ul style="margin:4px 0 0;padding-left:18px">'+icAbertas.map(i=>`<li>${esc(i.tipo||'—')} (${esc(i.gravidade||'—')}) — ${fmt(i.data_hora)}</li>`).join('')+'</ul>'
+        : 'Nenhuma intercorrência aberta.';
+      const avalTxt = [k?`Katz ${k.escore_total??'—'}/6`:null, l?`Lawton ${l.escore_total??'—'}`:null].filter(Boolean).join(' · ') || 'Sem avaliação registrada.';
+      return `<div class="rel-morador">
+        <h3>${esc(r.nome||'(sem nome)')}${r.quarto?` — Quarto ${esc(r.quarto)}`:''}</h3>
+        <p><b>Sinais vitais (último):</b> ${sinaisTxt}</p>
+        <p><b>Medicações ativas:</b> ${medTxt}</p>
+        <p><b>Intercorrências abertas:</b> ${icTxt}</p>
+        <p><b>Avaliações:</b> ${esc(avalTxt)}</p>
+      </div>`;
+    }).join('');
+
+    const win = window.open('', '_blank');
+    win.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Relatório — Village Viver Bem</title>
+      <style>
+        body{font-family:'Segoe UI',system-ui,sans-serif;color:#243b3a;padding:30px;max-width:800px;margin:0 auto}
+        h1{font-size:22px;color:#2f6f6e;border-bottom:3px solid #0AB287;padding-bottom:8px}
+        .cab{font-size:12px;color:#7d9a99;margin-bottom:20px}
+        .rel-morador{border:1px solid #e4eded;border-radius:10px;padding:14px 16px;margin-bottom:14px;page-break-inside:avoid}
+        .rel-morador h3{font-size:16px;color:#2f6f6e;margin:0 0 8px}
+        .rel-morador p{font-size:13px;margin:6px 0;line-height:1.5}
+        .aviso{font-size:11px;color:#8a99a8;margin-top:24px;border-top:1px solid #e4eded;padding-top:12px}
+        @media print{ .btn-print{display:none} }
+        .btn-print{background:#0AB287;color:#fff;border:none;border-radius:8px;padding:12px 20px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:20px}
+      </style></head><body>
+      <button class="btn-print" onclick="window.print()">🖨️ Imprimir / Salvar PDF</button>
+      <h1>📋 Relatório Geral de Residentes</h1>
+      <div class="cab">Village Viver Bem · Residencial Care · Gerado em ${agora} · ${ativos.length} residente(s) ativo(s)</div>
+      ${corpo || '<p>Nenhum residente ativo.</p>'}
+      <div class="aviso">Documento de apoio organizacional gerado automaticamente pelo sistema. Não substitui os registros clínicos oficiais exigidos pela vigilância sanitária.</div>
+      </body></html>`);
+    win.document.close();
+    const ld = document.getElementById('rel-loading'); if(ld) ld.remove();
+  }catch(e){
+    const ld = document.getElementById('rel-loading');
+    if(ld){ ld.style.color='#c0392b'; ld.textContent = 'Erro ao gerar: '+e.message; }
+  }
+}
 </script>
 </body>
 </html>
