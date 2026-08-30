@@ -276,13 +276,99 @@
             <input type="number" min="1" value="1" id="q-${m.id}">
             <button class="b-mais" onclick="mover(${m.id},1)">+ entrada</button>
             <button class="b-menos" onclick="mover(${m.id},-1)">− baixa</button>
+            <button class="b-edit" onclick="abrirEditar(${m.id})" title="Editar prescrição" style="background:#1a5276;color:#fff;border:0;border-radius:7px;padding:8px 10px;font-size:12.5px;font-weight:700;cursor:pointer">✏️ editar</button>
             <button class="b-del" onclick="excluir(${m.id})" title="Excluir">🗑️</button>
           </div>
+          <div id="edit-${m.id}" style="display:none;background:#f4f8fb;border:1px solid #d6e3ee;border-radius:10px;padding:12px;margin-top:8px"></div>
         </div>`;
       });
       html += `</div>`;
     });
     el.innerHTML = html;
+  }
+
+  // ---- Editar prescrição + estoque ----
+  async function abrirEditar(id){
+    const box = document.getElementById('edit-'+id);
+    if(!box) return;
+    if(box.style.display === 'block'){ box.style.display='none'; return; }
+    box.style.display = 'block';
+    box.innerHTML = '<div style="font-size:13px;color:#52616b">Carregando prescrição...</div>';
+    const item = DADOS.find(x=>x.id===id);
+    if(!item) return;
+    // busca a prescrição desse morador + remédio
+    let presc = null;
+    try{
+      const r = await fetch(SUPABASE_URL+'/rest/v1/prescricoes?select=*'
+        + '&morador=ilike.'+encodeURIComponent(item.morador)  // pode não existir a coluna morador; ignora se falhar
+        , {headers:H});
+    }catch(_e){}
+    try{
+      const r2 = await fetch(SUPABASE_URL+'/rest/v1/prescricoes?select=*'
+        + '&morador_nome=ilike.'+encodeURIComponent(item.morador)
+        + '&medicamento=ilike.'+encodeURIComponent(item.remedio), {headers:H});
+      const arr = await r2.json();
+      presc = (arr && arr.length) ? arr[0] : null;
+    }catch(_e){}
+
+    box.innerHTML = `
+      <div style="font-size:12.5px;font-weight:700;color:#1a5276;margin-bottom:8px">✏️ Editar — ${norm(item.remedio)} (${norm(item.morador)})</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div>
+          <label style="font-size:11px;color:#52616b;display:block;margin-bottom:2px">Dose (mg/ml)</label>
+          <input id="ed-dose-${id}" value="${presc?(presc.dose||''):''}" placeholder="Ex.: 50 mg" style="width:100%;padding:8px;border:1px solid #cdd6e0;border-radius:7px;font-size:13px">
+        </div>
+        <div>
+          <label style="font-size:11px;color:#52616b;display:block;margin-bottom:2px">Forma</label>
+          <select id="ed-forma-${id}" style="width:100%;padding:8px;border:1px solid #cdd6e0;border-radius:7px;font-size:13px">
+            ${['comprimido','ml','gotas','injecao'].map(f=>`<option value="${f}"${presc&&presc.forma===f?' selected':''}>${f==='ml'?'Líquido/ml':f.charAt(0).toUpperCase()+f.slice(1)}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <label style="font-size:11px;color:#52616b;display:block;margin-bottom:2px">Quantidade por vez</label>
+          <input id="ed-qtd-${id}" type="number" min="0" step="0.5" value="${presc?(presc.quantidade||1):1}" style="width:100%;padding:8px;border:1px solid #cdd6e0;border-radius:7px;font-size:13px">
+        </div>
+        <div>
+          <label style="font-size:11px;color:#52616b;display:block;margin-bottom:2px">Horário</label>
+          <input id="ed-hora-${id}" type="time" value="${presc?(presc.horario||''):''}" style="width:100%;padding:8px;border:1px solid #cdd6e0;border-radius:7px;font-size:13px">
+        </div>
+        <div style="grid-column:1/-1">
+          <label style="font-size:11px;color:#52616b;display:block;margin-bottom:2px">Via</label>
+          <input id="ed-via-${id}" value="${presc?(presc.via||''):''}" placeholder="Ex.: Oral, Gastrostomia" style="width:100%;padding:8px;border:1px solid #cdd6e0;border-radius:7px;font-size:13px">
+        </div>
+      </div>
+      ${!presc?'<div style="font-size:11.5px;color:#c0392b;margin-top:8px">⚠️ Não achei prescrição ligada — ao salvar, vou criar uma nova.</div>':''}
+      <button onclick="salvarEditar(${id}, ${presc?presc.id:'null'})" style="margin-top:10px;width:100%;background:#1a5276;color:#fff;border:0;border-radius:8px;padding:10px;font-size:13.5px;font-weight:700;cursor:pointer">💾 Salvar alteração</button>
+    `;
+  }
+
+  async function salvarEditar(estoqueId, prescId){
+    const item = DADOS.find(x=>x.id===estoqueId);
+    if(!item) return;
+    const dose = document.getElementById('ed-dose-'+estoqueId).value.trim();
+    const forma = document.getElementById('ed-forma-'+estoqueId).value;
+    const qtd = Number(document.getElementById('ed-qtd-'+estoqueId).value)||1;
+    const hora = document.getElementById('ed-hora-'+estoqueId).value.trim();
+    const via = document.getElementById('ed-via-'+estoqueId).value.trim();
+    const moradorId = idDoMorador(item.morador);
+    try{
+      const corpo = { dose:dose||null, forma:forma, quantidade:String(qtd), horario:hora||null, via:via||null };
+      if(prescId){
+        const r = await fetch(SUPABASE_URL+'/rest/v1/prescricoes?id=eq.'+prescId, {
+          method:'PATCH', headers:H, body: JSON.stringify(corpo)
+        });
+        if(!r.ok) throw new Error('Erro '+r.status);
+      } else {
+        // cria uma nova prescrição ligada
+        const r = await fetch(SUPABASE_URL+'/rest/v1/prescricoes', {
+          method:'POST', headers:H,
+          body: JSON.stringify({ ...corpo, morador_id: moradorId, morador_nome: item.morador, medicamento: item.remedio, ativo:true })
+        });
+        if(!r.ok) throw new Error('Erro '+r.status);
+      }
+      toast('Prescrição atualizada!');
+      const box = document.getElementById('edit-'+estoqueId); if(box) box.style.display='none';
+    }catch(e){ toast('Não consegui salvar ('+e.message+')', true); }
   }
 
   // ---- Dar entrada/baixa ----
