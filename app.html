@@ -1953,16 +1953,12 @@
       </div>
       ${bannerFuncionario(hashAtual)}
       <div style="padding:12px 16px 0">
-        <button id="btn-nova-presc" style="width:100%;display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--borda);border-radius:14px;padding:14px 16px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.04)">
-          <div style="width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;background:#eaf7f0;color:#1a6b4a;flex-shrink:0">➕</div>
-          <div style="text-align:left"><div style="font-size:14.5px;font-weight:700">Adicionar medicação (prescrição)</div><div style="font-size:11.5px;color:var(--muted)">Medicamento, dose, horário e quantidade por vez</div></div>
-        </button>
+        <div style="background:#eef6f6;border:1px solid #d6e8e7;border-radius:12px;padding:11px 14px;font-size:12px;color:var(--teal-esc)">💡 Para <b>cadastrar ou editar</b> uma medicação, use <b>Farmácia → Medicação por morador</b>. Aqui o cuidador apenas <b>confirma</b> o que foi administrado.</div>
       </div>
       <div id="med-area" class="wrap"><div class="estado"><div class="spin"></div>Carregando...</div></div>
       <div class="rodape">Village Viver Bem · Residencial Care · Medicações v1</div>
     `;
     document.getElementById('btn-voltar-morador').addEventListener('click', () => { location.hash = 'morador-' + moradorId; });
-    document.getElementById('btn-nova-presc').addEventListener('click', () => { location.hash = 'nova-prescricao-' + moradorId; });
     carregarMedicacoes(moradorId);
   }
 
@@ -1983,35 +1979,60 @@
       const dataSP = iso => { try{ return new Date(iso).toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'}); }catch(_e){ return ''; } };
       const hojeSP = new Date().toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'});
       const admHoje = admRecente.filter(a => dataSP(a.data_hora) === hojeSP);
-      el.innerHTML = prescricoes.map(p=>{
+      // Agrupa por turno pelo horário: Manhã 06-11:59, Tarde 12-17:59, Noite 18-05:59
+      const turnoDoHorario = h => {
+        const hh = parseInt(String(h||'').split(':')[0], 10);
+        if(isNaN(hh)) return 'semhora';
+        if(hh >= 6 && hh < 12) return 'manha';
+        if(hh >= 12 && hh < 18) return 'tarde';
+        return 'noite';
+      };
+      const TURNOS = [
+        {chave:'manha', nome:'🌅 Manhã', desc:'06:00 às 11:59', cor:'#e8933f', bg:'#fef4e8'},
+        {chave:'tarde', nome:'☀️ Tarde', desc:'12:00 às 17:59', cor:'#c99b1e', bg:'#fbf6e3'},
+        {chave:'noite', nome:'🌙 Noite / Madrugada', desc:'18:00 às 05:59', cor:'#4a6fa5', bg:'#eaf1fb'},
+        {chave:'semhora', nome:'⏰ Sem horário definido', desc:'Cadastre o horário para organizar', cor:'#8a99a8', bg:'#f2f4f6'}
+      ];
+      const grupos = {manha:[], tarde:[], noite:[], semhora:[]};
+      prescricoes.forEach(p=>{ grupos[turnoDoHorario(p.horario)].push(p); });
+      // dentro do turno, ordena por horário
+      Object.keys(grupos).forEach(k=> grupos[k].sort((a,b)=> String(a.horario||'').localeCompare(String(b.horario||''))));
+
+      const cardPresc = p => {
         const doHoje = admHoje.filter(a => norm(a.medicamento) === norm(p.medicamento) && norm(a.horario_previsto) === norm(p.horario));
         const dado = doHoje.some(a => norm(a.status).indexOf('adminis') >= 0);
         const badge = dado
           ? '<span style="font-size:11px;font-weight:700;color:#1e8449;background:#eaf7f0;padding:4px 10px;border-radius:20px;white-space:nowrap">✅ Dado hoje'+(doHoje.length>1?' x'+doHoje.length:'')+'</span>'
           : '<span style="font-size:11px;font-weight:700;color:#c0392b;background:#fdecec;padding:4px 10px;border-radius:20px;white-space:nowrap">⏳ Pendente</span>';
-        return `<div class="morador" data-id="${esc(p.id)}" style="align-items:center">
+        return `<div class="morador" data-id="${esc(p.id)}" style="align-items:center${dado?';opacity:.62':''}">
           <div class="js-med" data-id="${esc(p.id)}" style="cursor:pointer;display:flex;align-items:center;flex:1;gap:12px">
             <div class="av">💊</div>
             <div style="flex:1">
               <div class="nome">${esc(p.medicamento)}</div>
-              <div class="quarto">${esc(p.dose||'')}${p.via?' · '+esc(p.via):''}${p.horario?' · '+esc(p.horario):''}${(Number(p.quantidade)>0)?' · '+esc(p.quantidade)+' '+esc(p.forma||'un'):''}</div>
+              <div class="quarto">${p.horario?'<b>'+esc(p.horario)+'</b> · ':''}${esc(p.dose||'')}${p.via?' · '+esc(p.via):''}${(Number(p.quantidade)>0)?' · '+esc(p.quantidade)+' '+esc(p.forma||'un'):''}</div>
             </div>
             ${badge}
           </div>
-          <a href="#" class="js-med-suspender" data-id="${esc(p.id)}" data-nome="${esc(p.medicamento)}" data-stop="1" title="Suspender (médico suspendeu)" style="padding:8px 8px;color:#b9770e">⏸️</a>
-          <a href="#" class="js-med-excluir" data-id="${esc(p.id)}" data-nome="${esc(p.medicamento)}" data-stop="1" title="Excluir (prescrição errada/duplicada)" style="padding:8px 8px;color:#c0392b">🗑️</a>
         </div>`;
+      };
+
+      el.innerHTML = TURNOS.map(t=>{
+        const lista = grupos[t.chave];
+        if(!lista.length) return '';
+        const pendentes = lista.filter(p=>{
+          const doHoje = admHoje.filter(a => norm(a.medicamento) === norm(p.medicamento) && norm(a.horario_previsto) === norm(p.horario));
+          return !doHoje.some(a => norm(a.status).indexOf('adminis') >= 0);
+        }).length;
+        return `<div style="margin:18px 0 8px;padding:10px 14px;background:${t.bg};border-left:5px solid ${t.cor};border-radius:10px;display:flex;align-items:center;gap:10px">
+            <div style="font-size:15px;font-weight:800;color:${t.cor}">${t.nome}</div>
+            <div style="font-size:11px;color:var(--muted)">${t.desc}</div>
+            <div style="margin-left:auto;font-size:11.5px;font-weight:700;color:${pendentes>0?'#c0392b':'#1e8449'};background:#fff;padding:3px 10px;border-radius:20px">${pendentes>0?('⏳ '+pendentes+' pendente'+(pendentes>1?'s':'')):'✅ tudo dado'}</div>
+          </div>` + lista.map(cardPresc).join('');
       }).join('');
       el.querySelectorAll('.js-med').forEach(div=>{
         tornarClicavel(div, ()=>{ location.hash = 'administrar-' + div.dataset.id; });
       });
       el.querySelectorAll('[data-stop]').forEach(a=>{ a.addEventListener('click', e=>e.stopPropagation()); });
-      el.querySelectorAll('.js-med-suspender').forEach(a=>{
-        a.addEventListener('click', e=>{ e.preventDefault(); suspenderPrescricao(a.dataset.id, a.dataset.nome, moradorId); });
-      });
-      el.querySelectorAll('.js-med-excluir').forEach(a=>{
-        a.addEventListener('click', e=>{ e.preventDefault(); excluirPrescricao(a.dataset.id, a.dataset.nome, moradorId); });
-      });
     }catch(e){
       if(token !== viewToken) return;
       el.innerHTML = '⚠️ Não consegui carregar. <br><small>('+esc(e.message)+')</small>';
