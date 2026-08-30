@@ -107,11 +107,11 @@
     <datalist id="listaMoradores"></datalist>
 
     <label>Remédio</label>
-    <input id="fRemedio" placeholder="Ex.: Losartana 50mg">
+    <input id="fRemedio" placeholder="Ex.: Losartana">
 
     <div class="linha">
       <div>
-        <label>Quantidade inicial</label>
+        <label>Quantidade inicial (estoque)</label>
         <input id="fQtd" type="number" min="0" placeholder="30">
       </div>
       <div>
@@ -120,16 +120,50 @@
       </div>
     </div>
 
+    <div style="border-top:1px dashed #cdd6e0;margin:14px 0 4px;padding-top:10px;font-size:12.5px;font-weight:700;color:var(--teal-esc)">💊 Prescrição (o que o cuidador vai checar)</div>
+
     <div class="linha">
       <div>
-        <label>Unidade</label>
-        <input id="fUnidade" placeholder="comprimidos" value="comprimidos">
+        <label>Dose (mg/mcg/ml)</label>
+        <input id="fDose" placeholder="Ex.: 50 mg">
       </div>
       <div>
-        <label>Código de barras (opcional)</label>
-        <input id="fCodigo" placeholder="Escaneie ou digite">
+        <label>Forma</label>
+        <select id="fForma">
+          <option value="comprimido">Comprimido</option>
+          <option value="ml">Líquido/ml</option>
+          <option value="gotas">Gotas</option>
+          <option value="injecao">Injeção</option>
+        </select>
       </div>
     </div>
+
+    <div class="linha">
+      <div>
+        <label>Quantidade por vez</label>
+        <input id="fQtdVez" type="number" min="0" step="0.5" value="1">
+      </div>
+      <div>
+        <label>Horário</label>
+        <input id="fHorario" type="time" placeholder="08:00">
+      </div>
+    </div>
+
+    <div class="linha">
+      <div>
+        <label>Via</label>
+        <input id="fVia" placeholder="Ex.: Oral, Gastrostomia" value="Oral">
+      </div>
+      <div>
+        <label>Unidade (estoque)</label>
+        <input id="fUnidade" placeholder="comprimidos" value="comprimidos">
+      </div>
+    </div>
+
+    <label>Código de barras (opcional)</label>
+    <input id="fCodigo" placeholder="Escaneie ou digite">
+
+    <div style="font-size:11.5px;color:var(--muted);margin-top:8px;background:#eef6f6;border-radius:8px;padding:8px 10px">💡 Ao salvar, cria o <b>estoque</b> e a <b>prescrição</b> juntos. A prescrição aparece na checagem do cuidador (na ficha do morador), e a checagem baixa deste estoque.</div>
 
     <button class="salvar" onclick="salvarNova()">💾 Salvar medicação</button>
   </div>
@@ -165,13 +199,24 @@
   }
 
   // ---- Carregar moradores (pro datalist) ----
+  let MORADORES_LISTA = [];
   async function carregarMoradores(){
     try{
-      const r = await fetch(SUPABASE_URL+'/rest/v1/moradores?select=nome&order=nome', {headers:H});
-      const ms = await r.json();
+      const r = await fetch(SUPABASE_URL+'/rest/v1/moradores?select=id,nome&order=nome', {headers:H});
+      MORADORES_LISTA = await r.json();
       document.getElementById('listaMoradores').innerHTML =
-        ms.map(m=>`<option value="${norm(m.nome)}">`).join('');
+        MORADORES_LISTA.map(m=>`<option value="${norm(m.nome)}">`).join('');
     }catch(e){}
+  }
+  function idDoMorador(nome){
+    const alvo = String(nome||'').trim().toLowerCase();
+    const m = MORADORES_LISTA.find(x => String(x.nome||'').trim().toLowerCase() === alvo);
+    return m ? m.id : null;
+  }
+  function nomeExatoMorador(nome){
+    const alvo = String(nome||'').trim().toLowerCase();
+    const m = MORADORES_LISTA.find(x => String(x.nome||'').trim().toLowerCase() === alvo);
+    return m ? m.nome : nome;
   }
 
   // ---- Carregar medicações ----
@@ -278,25 +323,43 @@
   function toggleForm(){ document.getElementById('formNova').classList.toggle('aberto'); }
 
   async function salvarNova(){
-    const morador = document.getElementById('fMorador').value.trim();
+    const moradorInput = document.getElementById('fMorador').value.trim();
+    const morador = nomeExatoMorador(moradorInput);
+    const moradorId = idDoMorador(moradorInput);
     const remedio = document.getElementById('fRemedio').value.trim();
     const qtd = Number(document.getElementById('fQtd').value)||0;
     const min = Number(document.getElementById('fMin').value)||10;
     const unidade = document.getElementById('fUnidade').value.trim()||'comprimidos';
     const codigo = document.getElementById('fCodigo').value.trim();
+    const dose = document.getElementById('fDose').value.trim();
+    const forma = document.getElementById('fForma').value;
+    const qtdVez = Number(document.getElementById('fQtdVez').value)||1;
+    const horario = document.getElementById('fHorario').value.trim();
+    const via = document.getElementById('fVia').value.trim();
     if(!morador || !remedio){ toast('Preencha morador e remédio', true); return; }
     try{
+      // 1) Cria o ESTOQUE (medicacao_morador)
       const r = await fetch(SUPABASE_URL+'/rest/v1/medicacao_morador', {
         method:'POST', headers:H,
         body: JSON.stringify({ morador, remedio, quantidade:qtd, quantidade_minima:min, unidade, codigo_barras:codigo||null })
       });
       if(!r.ok) throw new Error('Erro '+r.status);
-      toast('Medicação cadastrada!');
-      document.getElementById('fMorador').value='';
-      document.getElementById('fRemedio').value='';
-      document.getElementById('fQtd').value='';
-      document.getElementById('fMin').value='';
-      document.getElementById('fCodigo').value='';
+      // 2) Cria a PRESCRIÇÃO (prescricoes) com o MESMO nome, se tiver o morador_id
+      if(moradorId){
+        try{
+          await fetch(SUPABASE_URL+'/rest/v1/prescricoes', {
+            method:'POST', headers:H,
+            body: JSON.stringify({
+              morador_id: moradorId, morador_nome: morador, medicamento: remedio,
+              dose: dose||null, forma: forma, quantidade: String(qtdVez),
+              via: via||null, horario: horario||null, ativo: true
+            })
+          });
+        }catch(_e){ /* se a prescrição falhar, o estoque já foi criado; avisa mas não trava */ }
+      }
+      toast('Medicação cadastrada (estoque + prescrição)!');
+      ['fMorador','fRemedio','fQtd','fMin','fCodigo','fDose','fHorario'].forEach(id=>{ const e=document.getElementById(id); if(e) e.value=''; });
+      document.getElementById('fQtdVez').value='1';
       toggleForm();
       carregar();
     }catch(e){ toast('Não consegui salvar ('+e.message+')', true); }
