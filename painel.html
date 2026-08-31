@@ -93,8 +93,9 @@ async function montar(){
     api('avaliacoes_lawton?select=*&order=data_hora.desc&limit=500').catch(()=>[])
   ]);
 
-  const totalRes = residentes.length;
-  const ativos = residentes.filter(r => r.ativo !== false).length;
+  const residentesAtivos = residentes.filter(r => r.ativo !== false);
+  const totalRes = residentesAtivos.length;
+  const ativos = residentesAtivos.length;
 
   const seteDias = Date.now() - 7*86400000;
   // Só o ÚLTIMO sinal de cada morador conta: se a medição mais recente (7 dias) tem alerta, mostra.
@@ -120,9 +121,9 @@ async function montar(){
 
   const genderOf = (g) => { const x = norm(g); if (x.indexOf('masc')===0 || x.indexOf('homem')>=0) return 'M'; if (x.indexOf('femin')===0 || x.indexOf('mulher')>=0) return 'F'; return 'O'; };
   const byName = (a,b) => norm(a.nome).localeCompare(norm(b.nome));
-  const homens = residentes.filter(r => genderOf(r.sexo)==='M').sort(byName);
-  const mulheres = residentes.filter(r => genderOf(r.sexo)==='F').sort(byName);
-  const outros = residentes.filter(r => genderOf(r.sexo)==='O').sort(byName);
+  const homens = residentesAtivos.filter(r => genderOf(r.sexo)==='M').sort(byName);
+  const mulheres = residentesAtivos.filter(r => genderOf(r.sexo)==='F').sort(byName);
+  const outros = residentesAtivos.filter(r => genderOf(r.sexo)==='O').sort(byName);
   const genLink = (r) => `<li><a href="app.html#morador-${encodeURIComponent(r.id)}">${esc(r.nome||'(sem nome)')}${r.quarto?` <small style="color:#8a99a8">· ${esc(r.quarto)}</small>`:''}</a></li>`;
   const menCol = `<div class="gcol men"><div class="gh"><span>👨 Homens</span><span>${homens.length}</span></div><ul>${homens.map(genLink).join('') || '<li class="empty" style="padding:10px 16px">Nenhum</li>'}</ul></div>`;
   const womenCol = `<div class="gcol women"><div class="gh"><span>👩 Mulheres</span><span>${mulheres.length}</span></div><ul>${mulheres.map(genLink).join('') || '<li class="empty" style="padding:10px 16px">Nenhum</li>'}</ul></div>`;
@@ -155,7 +156,7 @@ async function montar(){
   const dataAnterior = addDays(DATA_SEL, -1);
   const dataProxima = addDays(DATA_SEL, 1);
 
-  const ativosLista = residentes.filter(r => r.ativo !== false).sort(byName);
+  const ativosLista = residentesAtivos.slice().sort(byName);
   const medAdministradoNoDia = (medName, admDia) => admDia.some(a => norm(a.medicamento) === norm(medName) && norm(a.status).indexOf('adminis') >= 0);
 
   const ultimaAvaliacao = (lista, moradorId) => lista.find(a => String(a.morador_id) === String(moradorId));
