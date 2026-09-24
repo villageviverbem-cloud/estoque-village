@@ -1850,6 +1850,123 @@
     });
   }
 
+  // Monta um resumo narrativo formal em linguagem de enfermagem, a partir dos dados do período
+  function montarResumoEnfermagem(m, deYMD, ateYMD, d){
+    const nn = s => String(s||'').trim().toLowerCase();
+    const cont = (arr, campo, termos) => arr.filter(x=> termos.some(t=> nn(x[campo]).indexOf(t)>=0)).length;
+    const periodo = (deYMD===ateYMD)
+      ? ('no dia ' + new Date(deYMD+'T12:00:00').toLocaleDateString('pt-BR'))
+      : ('no período de ' + new Date(deYMD+'T12:00:00').toLocaleDateString('pt-BR') + ' a ' + new Date(ateYMD+'T12:00:00').toLocaleDateString('pt-BR'));
+    const partes = [];
+
+    // Abertura
+    partes.push(`Paciente <b>${esc(m.nome)}</b>${m.quarto?(', alojado(a) no quarto '+esc(m.quarto)):''}, acompanhado(a) ${periodo} conforme registros da equipe.`);
+
+    // Sinais vitais
+    if(d.sinais.length){
+      const comAlerta = d.sinais.filter(s=> s.alertas && String(s.alertas).trim());
+      if(comAlerta.length){
+        const quais = [...new Set(comAlerta.map(s=>String(s.alertas)).join(', ').split(',').map(x=>x.trim()).filter(Boolean))].join(', ');
+        partes.push(`Aferidos ${d.sinais.length} controle(s) de sinais vitais, com ${comAlerta.length} registro(s) apresentando alteração (${esc(quais)}), devidamente sinalizado(s) à equipe. Demais aferições dentro dos parâmetros habituais do paciente.`);
+      } else {
+        partes.push(`Aferidos ${d.sinais.length} controle(s) de sinais vitais, todos dentro dos parâmetros habituais do paciente, sem alterações dignas de nota.`);
+      }
+    } else {
+      partes.push('Não há registro de aferição de sinais vitais no período.');
+    }
+
+    // Alimentação / hidratação
+    const alim = d.cuidados.filter(c=> nn(c.tipo)==='alimentacao');
+    const agua = d.cuidados.filter(c=> nn(c.tipo)==='agua');
+    if(alim.length || agua.length){
+      let fr = '';
+      if(alim.length){
+        const recusas = alim.filter(a=> nn(a.valor).indexOf('recus')>=0).length;
+        const parcial = alim.filter(a=> nn(a.valor).indexOf('parcial')>=0).length;
+        if(recusas>0) fr += `Aceitação alimentar variável, com ${recusas} recusa(s) registrada(s)`;
+        else if(parcial>0) fr += `Aceitação alimentar parcial em ${parcial} refeição(ões)`;
+        else fr += 'Boa aceitação alimentar nas refeições ofertadas';
+      }
+      if(agua.length) fr += (fr?'; ':'') + `hidratação registrada em ${agua.length} momento(s)`;
+      partes.push(fr + '.');
+    }
+
+    // Eliminações
+    const evac = d.cuidados.filter(c=> nn(c.tipo)==='evacuacao');
+    const diur = d.cuidados.filter(c=> nn(c.tipo)==='diurese');
+    if(evac.length || diur.length){
+      partes.push(`Eliminações fisiológicas acompanhadas${evac.length?(' — evacuação registrada '+evac.length+' vez(es)'):''}${diur.length?(', diurese registrada '+diur.length+' vez(es)'):''}.`);
+    }
+
+    // Higiene / fralda / decúbito / mobilidade
+    const hig = d.cuidados.filter(c=> nn(c.tipo)==='higiene').length;
+    const fra = d.cuidados.filter(c=> nn(c.tipo)==='fralda').length;
+    const dec = d.cuidados.filter(c=> nn(c.tipo)==='decubito').length;
+    const mob = d.cuidados.filter(c=> nn(c.tipo)==='mobilidade');
+    let cuid = [];
+    if(hig) cuid.push(`higiene/banho realizada(o) (${hig} registro(s))`);
+    if(fra) cuid.push(`troca/checagem de fralda (${fra} registro(s))`);
+    if(dec) cuid.push(`mudança de decúbito (${dec} registro(s)) para prevenção de lesão por pressão`);
+    if(cuid.length) partes.push('Cuidados de higiene e conforto prestados: ' + cuid.join(', ') + '.');
+    if(mob.length){
+      const acamado = mob.filter(x=> nn(x.valor).indexOf('acamad')>=0).length;
+      partes.push(acamado>0 ? 'Paciente permaneceu predominantemente acamado(a) no período.' : 'Mobilidade preservada/assistida conforme registros.');
+    }
+
+    // Pele / curativo
+    const pele = d.cuidados.filter(c=> nn(c.tipo)==='pele');
+    const curat = d.cuidados.filter(c=> nn(c.tipo)==='curativo');
+    if(pele.length || curat.length){
+      const alterada = pele.filter(x=> nn(x.valor).indexOf('altera')>=0).length;
+      partes.push(`Avaliação de integridade cutânea realizada${alterada>0?(', com '+alterada+' registro(s) de alteração de pele que requer(em) atenção'):', pele íntegra sem alterações dignas de nota'}${curat.length?('; curativo(s) realizado(s) em '+curat.length+' momento(s)'):''}.`);
+    }
+
+    // Comportamento / dor
+    const comp = d.cuidados.filter(c=> nn(c.tipo)==='comportamento');
+    const dor = d.cuidados.filter(c=> nn(c.tipo)==='dor');
+    if(comp.length){
+      const agitado = comp.filter(x=> nn(x.valor).indexOf('agitad')>=0 || nn(x.valor).indexOf('confus')>=0).length;
+      partes.push(agitado>0 ? `Observadas alterações de comportamento (agitação/confusão) em ${agitado} registro(s).` : 'Paciente apresentou-se calmo(a) e cooperativo(a).');
+    }
+    if(dor.length){
+      const comDor = dor.filter(x=> nn(x.valor).indexOf('sem dor')<0).length;
+      if(comDor>0) partes.push(`Relato/observação de dor em ${comDor} registro(s), monitorada pela equipe.`);
+    }
+
+    // Medicações
+    if(d.meds && d.meds.length){
+      const adm = d.meds.filter(a=> nn(a.status).indexOf('adminis')>=0).length;
+      const rec = d.meds.filter(a=> nn(a.status).indexOf('recus')>=0).length;
+      partes.push(`Terapia medicamentosa administrada conforme prescrição (${adm} administração(ões) registrada(s)${rec>0?(', com '+rec+' recusa(s)'):''}).`);
+    }
+
+    // Intercorrências
+    if(d.interc.length){
+      partes.push(`Registrada(s) ${d.interc.length} intercorrência(s) no período: ${d.interc.map(i=>esc(i.tipo||'ocorrência')+' ('+esc(i.gravidade||'—')+')').join(', ')} — com as devidas condutas adotadas pela equipe.`);
+    } else {
+      partes.push('Não houve intercorrências registradas no período.');
+    }
+
+    // Nutrição
+    if(d.nutri.length){
+      const ult = d.nutri[0];
+      partes.push(`Avaliação nutricional realizada: peso ${ult.peso||'—'} kg, IMC ${ult.imc||'—'}${ult.classificacao_imc?(' ('+esc(ult.classificacao_imc)+')'):''}${ult.circ_panturrilha?(', circunferência de panturrilha '+ult.circ_panturrilha+' cm'):''}.`);
+    }
+
+    // Avaliações funcionais
+    if(d.katz.length || d.lawton.length){
+      let av = [];
+      if(d.katz.length) av.push('Escala de Katz (AVD) escore '+ (d.katz[0].escore_total ?? '—') +'/6');
+      if(d.lawton.length) av.push('Escala de Lawton (AIVD) escore '+ (d.lawton[0].escore_total ?? '—'));
+      partes.push('Avaliação funcional: ' + av.join('; ') + '.');
+    }
+
+    // Fechamento
+    partes.push('Paciente segue sob cuidados integrais e monitoramento contínuo da equipe multiprofissional. Registro elaborado a partir dos dados assistenciais documentados no período.');
+
+    return '<b class="tit">📝 Resumo de Enfermagem</b>' + partes.map(p=>p).join(' ');
+  }
+
   async function gerarRelatorioMorador(moradorId, deYMD, ateYMD){
     const msg = document.getElementById('rm-msg');
     if(msg) msg.textContent = 'Gerando relatório...';
@@ -1860,14 +1977,16 @@
       const noPeriodo = iso => { try{ const t = new Date(iso).getTime(); return t >= iniMs && t <= fimMs; }catch(_e){ return false; } };
       const fmtD = iso => { try{ return new Date(iso).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'}); }catch(_e){ return String(iso||''); } };
       const v = x => (x===null||x===undefined||x==='') ? '—' : x;
-      const [mrows, sinais, katz, lawton, interc, evol, cuidados] = await Promise.all([
+      const [mrows, sinais, katz, lawton, interc, evol, cuidados, nutri, meds] = await Promise.all([
         api('moradores?select=*&id=eq.'+encodeURIComponent(moradorId)),
         api('sinais_vitais?select=*&morador_id=eq.'+encodeURIComponent(moradorId)+'&order=data_hora.desc&limit=500').catch(()=>[]),
         api('avaliacoes_katz?select=*&morador_id=eq.'+encodeURIComponent(moradorId)+'&order=data_hora.desc&limit=50').catch(()=>[]),
         api('avaliacoes_lawton?select=*&morador_id=eq.'+encodeURIComponent(moradorId)+'&order=data_hora.desc&limit=50').catch(()=>[]),
         api('intercorrencias?select=*&morador_id=eq.'+encodeURIComponent(moradorId)+'&order=data_hora.desc&limit=200').catch(()=>[]),
         api('evolucoes_diarias?select=*&morador_id=eq.'+encodeURIComponent(moradorId)+'&order=data_hora.desc&limit=200').catch(()=>[]),
-        api('registros_cuidado?select=*&morador_id=eq.'+encodeURIComponent(moradorId)+'&order=data_hora.desc&limit=1000').catch(()=>[])
+        api('registros_cuidado?select=*&morador_id=eq.'+encodeURIComponent(moradorId)+'&order=data_hora.desc&limit=1000').catch(()=>[]),
+        api('avaliacoes_nutricionais?select=*&morador_id=eq.'+encodeURIComponent(moradorId)+'&order=data_hora.desc&limit=50').catch(()=>[]),
+        api('administracao_medicamentos?select=*&morador_id=eq.'+encodeURIComponent(moradorId)+'&order=data_hora.desc&limit=1000').catch(()=>[])
       ]);
       const m = mrows[0] || {nome:'—'};
       const sF = sinais.filter(r=>noPeriodo(r.data_hora));
@@ -1876,6 +1995,11 @@
       const iF = interc.filter(r=>noPeriodo(r.data_hora));
       const eF = evol.filter(r=>noPeriodo(r.data_hora));
       const cF = cuidados.filter(r=>noPeriodo(r.data_hora)).sort((a,b)=>new Date(a.data_hora)-new Date(b.data_hora));
+      const nF = nutri.filter(r=>noPeriodo(r.data_hora));
+      const medF = meds.filter(r=>noPeriodo(r.data_hora));
+
+      // ===== RESUMO NARRATIVO FORMAL (linguagem de enfermagem) =====
+      const resumoEnfermagem = montarResumoEnfermagem(m, deYMD, ateYMD, {sinais:sF, cuidados:cF, evolucoes:eF, interc:iF, katz:kF, lawton:lF, nutri:nF, meds:medF});
 
       // nomes amigáveis dos tipos de cuidado
       const nomesTipo = {agua:'💧 Hidratação',fralda:'🧷 Fralda',alimentacao:'🍽️ Alimentação',higiene:'🛁 Higiene/Banho',decubito:'🔄 Mudança de decúbito',curativo:'🩹 Curativo',evacuacao:'🚽 Evacuação',diurese:'💛 Diurese',mobilidade:'🚶 Mobilidade',pele:'🧴 Pele',comportamento:'🧠 Comportamento',dor:'😖 Dor',anotacao:'📝 Anotação'};
@@ -1903,19 +2027,23 @@
           th{background:#f2f8f8;color:#2f6f6e}
           .reg{border:1px solid #e4eded;border-radius:8px;padding:9px 12px;margin-bottom:8px;font-size:12.5px;line-height:1.5}
           .vazio{color:#8a99a8;font-size:12.5px;font-style:italic}
+          .resumo-enf{background:#f4f8f8;border:1px solid #d6e8e7;border-left:4px solid #0AB287;border-radius:8px;padding:14px 16px;margin:14px 0 6px;font-size:12.5px;line-height:1.75;text-align:justify}
+          .resumo-enf b.tit{display:block;color:#2f6f6e;font-size:13px;margin-bottom:6px}
           .aviso{font-size:11px;color:#8a99a8;margin-top:24px;border-top:1px solid #e4eded;padding-top:12px}
           .btn-print{background:#0AB287;color:#fff;border:none;border-radius:8px;padding:12px 20px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:18px}
           @media print{ .btn-print{display:none} }
         </style></head><body>
         <button class="btn-print" onclick="window.print()">🖨️ Imprimir / Salvar PDF</button>
-        <h1>📋 Relatório do Residente</h1>
+        <h1>📋 Relatório de Enfermagem</h1>
         <div class="cab"><b>${esc(m.nome)}</b>${m.quarto?(' · Quarto '+esc(m.quarto)):''} · ${periodoTxt} · Gerado em ${agora}</div>
+        <div class="resumo-enf">${resumoEnfermagem}</div>
         <h2>❤️ Sinais Vitais (${sF.length})</h2>${sinaisHtml}
         <h2>🧾 Cuidados Diários (${cF.length})</h2>${cuidadosHtml}
         <h2>📔 Evoluções (${eF.length})</h2>${evolHtml}
         <h2>🚨 Intercorrências (${iF.length})</h2>${intercHtml}
-        <h2>📋 Avaliações (${kF.length+lF.length})</h2>${avalHtml}
-        <div class="aviso">Documento de apoio organizacional gerado pelo sistema Village Viver Bem. Não substitui os registros clínicos oficiais exigidos pela vigilância sanitária.</div>
+        <h2>🥗 Avaliação Nutricional (${nF.length})</h2>${nF.length ? nF.map(n=>`<div class="reg"><b>${fmtD(n.data_hora)}</b>${n.nutricionista?(' — '+esc(n.nutricionista)+(n.crn?(' ('+esc(n.crn)+')'):'')):''}<br>Peso: ${v(n.peso)} kg · Altura: ${v(n.altura)} cm · IMC: ${v(n.imc)} ${n.classificacao_imc?('('+esc(n.classificacao_imc)+')'):''}${n.circ_panturrilha?(' · Panturrilha: '+n.circ_panturrilha+' cm'):''}${n.observacao?('<br>Conduta: '+esc(n.observacao)):''}</div>`).join('') : '<p class="vazio">Nenhuma avaliação nutricional no período.</p>'}
+        <h2>📋 Avaliações Funcionais (${kF.length+lF.length})</h2>${avalHtml}
+        <div class="aviso">Documento de apoio organizacional gerado pelo sistema Village Viver Bem Residencial-Care. Não substitui os registros clínicos oficiais exigidos pela vigilância sanitária.</div>
         </body></html>`);
       win.document.close();
       if(msg) msg.textContent = 'Relatório aberto em nova aba. Use o botão Imprimir / Salvar PDF.';
