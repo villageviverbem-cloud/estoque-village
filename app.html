@@ -172,6 +172,8 @@
     <a class="sb-link" data-hash="estoque" href="#estoque"><span class="ico">📊</span>Ver Estoque Geral</a>
     <div class="sb-sep"></div>
     <a class="sb-link" id="sb-financeiro" href="#"><span class="ico">💰</span>Financeiro (DRE)</a>
+    <div class="sb-sep"></div>
+    <a class="sb-link" id="sb-sair" href="#" style="color:#c0392b"><span class="ico">🚪</span>Sair (bloquear acesso)</a>
   </nav>
   <div id="main-content">
     <div id="app"></div>
@@ -210,6 +212,7 @@
 
   // ---------- BARRA LATERAL ----------
   document.getElementById('sb-financeiro').addEventListener('click', function(e){ e.preventDefault(); irExterno('financeiro', APP_FINANCEIRO); });
+  document.getElementById('sb-sair').addEventListener('click', function(e){ e.preventDefault(); if(confirm('Sair e bloquear o acesso? Será preciso entrar de novo com o PIN.')){ localStorage.removeItem('vv_funcionario'); location.hash='inicio'; router(); } });
   document.getElementById('sb-painel').addEventListener('click', function(e){ e.preventDefault(); irExterno('painel', PAINEL_URL); });
   document.getElementById('sb-medicamentos').addEventListener('click', function(e){ e.preventDefault(); location.hash = 'moradores'; });
   function toggleSidebar(forcar){
@@ -4268,11 +4271,40 @@
   function apósPrefixo(hash, prefixo){
     return hash.indexOf(prefixo) === 0 ? hash.slice(prefixo.length) : null;
   }
+  // ---------- TELA DE ENTRADA (trava de acesso + LGPD) ----------
+  function telaEntrada(){
+    app.innerHTML = `
+      <div class="topo grande" style="background:linear-gradient(120deg,var(--grad1),var(--grad2))">
+        <div class="logo">Residencial Care</div>
+        <h1>🌳 Village Viver Bem</h1>
+        <p>Sistema de Cuidado · acesso restrito</p>
+      </div>
+      <div class="wrap" style="padding:24px 18px;max-width:520px;margin:0 auto">
+        <div style="background:#fff;border:1px solid var(--borda);border-radius:16px;padding:22px;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.05)">
+          <div style="font-size:44px;margin-bottom:8px">🔒</div>
+          <div style="font-size:17px;font-weight:700;color:var(--teal-esc);margin-bottom:6px">Acesso restrito à equipe</div>
+          <div style="font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:18px">Este sistema contém <b>dados sensíveis de saúde</b> dos residentes, protegidos pela <b>Lei Geral de Proteção de Dados (LGPD)</b>. O acesso é exclusivo a profissionais autorizados e todo uso é registrado.</div>
+          <a href="#funcionarios" style="display:inline-block;background:var(--teal);color:#fff;text-decoration:none;border-radius:12px;padding:14px 28px;font-size:15px;font-weight:700">🔑 Entrar com meu acesso</a>
+        </div>
+        <div style="background:#fef9e7;border:1px solid #f5e6a8;border-radius:12px;padding:14px 16px;margin-top:16px;font-size:11.5px;color:#7a6000;line-height:1.6">
+          <b>⚠️ Aviso de Confidencialidade:</b> As informações aqui contidas são sigilosas. É proibido compartilhar, copiar, fotografar ou divulgar dados dos residentes sem autorização. O uso indevido está sujeito às penalidades da LGPD (Lei 13.709/2018) e do Código de Ética profissional.
+        </div>
+      </div>
+    `;
+  }
+
   function router(){
     viewToken++;
     const rawHash = location.hash.replace('#','') || 'inicio';
     const hash = rawHash.split('?')[0];
     let m;
+    // 🔒 TRAVA DE ENTRADA: sem login, só mostra a tela de acesso (protege os dados)
+    if(!funcionarioAtual() && hash !== 'funcionarios' && hash.indexOf('funcionarios') !== 0){
+      telaEntrada();
+      atualizarSidebarAtiva(hash);
+      window.scrollTo(0,0);
+      return;
+    }
     if(hash === 'inicio') telaInicio();
     else if(hash === 'estoque') telaEstoque();
     else if(hash === 'moradores') telaMoradores();
